@@ -437,6 +437,9 @@
           <label>API Key (ສາມາດໃສ່ຫຼາຍ Key ຄັ່ນດ້ວຍເຄື່ອງໝາຍ , ເພື່ອສະຫຼັບອັດຕະໂນມັດ)</label>
           <input id="apiKey" type="password" placeholder="ວາງ API Key ຂອງທ່ານ (ຫຼື key1, key2)">
 
+          <label>Groq API Key ສຳຮອງອັດຕະໂນມັດ (ບໍ່ບັງຄັບ — ສະຫຼັບໄປ Groq ທັນທີເມື່ອ Google AI ແອອັດ/ໂຄຕ້າເຕັມ)</label>
+          <input id="groqBackupKey" type="password" placeholder="ວາງ Groq Key (gsk_...) ເພື່ອກັນພາດ 100%">
+
           <label>Model</label>
           <div style="display:flex; gap:8px; align-items:center">
             <input id="model" value="gemini-2.5-flash" style="flex:1">
@@ -928,174 +931,80 @@
     return cachedGeminiModels;
   }
 
-  async function callAI(prompt, { onProgress = null, onChunk = null, onModelUsed = null, timeoutMs = 25000, fastTest = false } = {}) {
+  async function callAI(prompt, { onProgress = null, onChunk = null, onModelUsed = null, timeoutMs = 60000, fastTest = false } = {}) {
     const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
     const keys = String(cfg.key || '').split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
-    if (!keys.length) throw new Error('ຍັງບໍ່ໄດ້ປ້ອນ API Key');
+    const groqBackupKey = (cfg.groqBackupKey || '').trim();
+    if (!keys.length && !groqBackupKey) throw new Error('ຍັງບໍ່ໄດ້ປ້ອນ API Key');
 
     const endpoint = cfg.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-    const primaryModel = (cfg.model || 'gemini-2.5-flash').trim();
+    const primaryModel = (cfg.model || 'gemini-3.5-flash-lite').trim();
     const sysPrompt = fastTest
       ? 'ຕອບສັ້ນໆ ຕາມຄຳສັ່ງ.'
       : (cfg.systemPrompt || 'ຊ່ວຍສັງເຄາະລາຍງານພາສາລາວ ໂດຍບໍ່ແຕ່ງຂໍ້ມູນ.');
     const isGemini = endpoint.includes('generativelanguage.googleapis.com');
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-    let savedPrefix = '';
-
-    function getActivePrompt() {
-      if (!savedPrefix) return prompt;
-      return `${prompt}\n\n---\nຂໍ້ຄວາມທີ່ຂຽນໄວ້ແລ້ວກ່ອນໜ້ານີ້ (ໃຫ້ຂຽນຕໍ່ຈາກບັນທັດສຸດທ້າຍນີ້ທັນທີ ຈົນຈົບຄົບທັງ 3 ພາກ ໂດຍບໍ່ຕ້ອງເລີ່ມຕົ້ນຫົວບົດໃໝ່):\n${savedPrefix.slice(-900)}`;
-    }
-
-    function mergeWithPrefix(newPart) {
-      return savedPrefix ? `${savedPrefix}\n${newPart.trimStart()}` : newPart;
-    }
-
-    async function sendRequest(targetModel, apiKey, simpleMode = false) {
-      const activePrompt = getActivePrompt();
-      const useStream = isGemini && typeof onChunk === 'function';
-      const url = isGemini
-        ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:${useStream ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${encodeURIComponent(apiKey)}`
-        : endpoint;
-
-      const headers = isGemini
-        ? { 'Content-Type': 'application/json' }
-        : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
-
+    // ສົ່ງຄຳສັ່ງຫາ Google Gemini ແບບປົກກະຕິ (ບໍ່ໃຊ້ Streaming ເພື່ອຕັດບັນຫາ 502 / ຂາດຊ່ວງ)
+    async function sendGemini(targetModel, apiKey, activePrompt, simpleMode = false) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:generateContent?key=${encodeURIComponent(apiKey)}`;
       const isGemma = /gemma/i.test(targetModel);
       const genConfig = {
         temperature: 0.2,
-        maxOutputTokens: fastTest ? 30 : (isGemma ? 8192 : 16384)
+        maxOutputTokens: fastTest ? 40 : 8192
       };
-      if (!simpleMode && /^gemini-2\.5-flash$/i.test(targetModel)) {
-        genConfig.thinkingConfig = { thinkingBudget: 0 };
-      }
 
-      const payload = isGemini
-        ? ((isGemma || simpleMode)
-            ? {
-                contents: [{ role: 'user', parts: [{ text: `${sysPrompt}\n\n${activePrompt}` }] }],
-                generationConfig: genConfig
-              }
-            : {
-                system_instruction: { parts: [{ text: sysPrompt }] },
-                contents: [{ role: 'user', parts: [{ text: activePrompt }] }],
-                safetySettings: [
-                  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-                  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-                  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-                  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
-                ],
-                generationConfig: genConfig
-              })
+      const payload = (isGemma || simpleMode)
+        ? {
+            contents: [{ role: 'user', parts: [{ text: `${sysPrompt}\n\n${activePrompt}` }] }],
+            generationConfig: genConfig
+          }
         : {
-            model: targetModel,
-            temperature: 0.2,
-            ...(fastTest ? { max_tokens: 30 } : {}),
-            messages: [
-              { role: 'system', content: sysPrompt },
-              { role: 'user', content: activePrompt }
-            ]
+            system_instruction: { parts: [{ text: sysPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: activePrompt }] }],
+            safetySettings: [
+              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+            ],
+            generationConfig: genConfig
           };
 
       const controller = new AbortController();
-      // ຖ້າເຊີບເວີບໍ່ຕອບພາຍໃນ 15 ວິນາທີ (ຫຼື timeoutMs) ໃຫ້ຕັດທັນທີເພື່ອບໍ່ໃຫ້ຄ້າງ
-      const initTimeout = fastTest ? timeoutMs : Math.min(timeoutMs, 15000);
-      let timer = setTimeout(() => controller.abort(), initTimeout);
+      const waitMs = fastTest ? 15000 : Math.max(timeoutMs, 60000);
+      const timer = setTimeout(() => controller.abort(), waitMs);
 
       try {
         const res = await fetch(url, {
           method: 'POST',
-          headers,
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
           signal: controller.signal
         });
 
         if (!res.ok) {
-          if (isGemini && res.status === 400 && !simpleMode) {
+          if (res.status === 400 && !simpleMode) {
             clearTimeout(timer);
-            return sendRequest(targetModel, apiKey, true);
+            return sendGemini(targetModel, apiKey, activePrompt, true);
           }
           const data = await res.json().catch(() => ({}));
-          return { res, data, text: '' };
-        }
-
-        if (useStream && res.body) {
-          const reader = res.body.getReader();
-          const decoder = new TextDecoder();
-          let buffer = '';
-          let fullText = '';
-          let finishReason = '';
-          let stalled = false;
-
-          const resetStallTimer = () => {
-            clearTimeout(timer);
-            timer = setTimeout(() => {
-              stalled = true;
-              controller.abort();
-            }, 12000); // ຖ້າຂໍ້ຄວາມຢຸດໄຫຼເກີນ 12 ວິນາທີ ໃຫ້ຕັດທັນທີ
-          };
-          resetStallTimer();
-
-          const processLine = line => {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith('data:')) return;
-            const jsonStr = trimmed.slice(5).trim();
-            if (!jsonStr || jsonStr === '[DONE]') return;
-            try {
-              const chunk = JSON.parse(jsonStr);
-              const cand = chunk.candidates?.[0];
-              if (cand?.finishReason) finishReason = cand.finishReason;
-              const parts = cand?.content?.parts || [];
-              const delta = parts.filter(p => !p.thought && p.text).map(p => p.text).join('');
-              if (delta) {
-                fullText += delta;
-                onChunk(mergeWithPrefix(fullText));
-              }
-            } catch (_) {}
-          };
-
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) {
-                buffer += decoder.decode();
-                if (buffer.trim()) buffer.split('\n').forEach(processLine);
-                break;
-              }
-              resetStallTimer();
-              buffer += decoder.decode(value, { stream: true });
-              const lines = buffer.split('\n');
-              buffer = lines.pop() || '';
-              lines.forEach(processLine);
-            }
-          } catch (readErr) {
-            if (!stalled && readErr.name !== 'AbortError') throw readErr;
-          }
-
-          const combined = mergeWithPrefix(fullText);
-          if (!fullText.trim()) {
-            return { res: { ok: false, status: 502 }, data: { error: { message: 'AI ຕອບຊ້າ ຫຼື ບໍ່ສົ່ງເນື້ອຫາກັບມາ' } }, text: '' };
-          }
-          // ຖ້າຂາດຊ່ວງກາງຄັນແຕ່ໄດ້ຂໍ້ຄວາມມາແລ້ວ >= 100 ຕົວອັກສອນ ໃຫ້ເກັບໄວ້ແລ້ວຂຽນຕໍ່ທັນທີ
-          if (finishReason !== 'STOP' || stalled) {
-            if (combined.trim().length >= 100) {
-              const lastNl = combined.lastIndexOf('\n');
-              savedPrefix = lastNl > 80 ? combined.slice(0, lastNl) : combined;
-            }
-            return { res: { ok: false, status: 502 }, data: { error: { message: 'ຂາດຊ່ວງກາງຄັນ' } }, text: savedPrefix };
-          }
-          return { res, data: {}, text: combined };
+          return { ok: false, status: res.status, data, text: '', finishReason: '' };
         }
 
         const data = await res.json().catch(() => ({}));
-        const rawText = isGemini
-          ? (data.candidates?.[0]?.content?.parts?.filter(p => !p.thought && p.text).map(p => p.text).join('') || 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ.')
-          : (data.choices?.[0]?.message?.content || 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ.');
-        return { res, data, text: mergeWithPrefix(rawText) };
+        const cand = data.candidates?.[0];
+        const finishReason = cand?.finishReason || 'STOP';
+        const parts = cand?.content?.parts || [];
+        const text = parts.filter(p => !p.thought && p.text).map(p => p.text).join('');
+
+        if (!text.trim()) {
+          return { ok: false, status: 502, data: { error: { message: `AI ບໍ່ສົ່ງເນື້ອຫາ (${finishReason})` } }, text: '', finishReason };
+        }
+        return { ok: true, status: 200, data, text, finishReason };
       } catch (err) {
         if (err.name === 'AbortError') {
-          throw new Error('ເຊີບເວີຕອບຊ້າ (ເກີນ 15 ວິນາທີ)');
+          throw new Error(`ຕອບຊ້າເກີນ ${Math.round(waitMs / 1000)} ວິນາທີ`);
         }
         throw err;
       } finally {
@@ -1103,96 +1012,178 @@
       }
     }
 
+    // ສົ່ງຄຳສັ່ງຫາ Groq / OpenAI-Compatible API
+    async function sendOpenAI(targetUrl, targetModel, apiKey, activePrompt) {
+      const controller = new AbortController();
+      const waitMs = fastTest ? 15000 : Math.max(timeoutMs, 60000);
+      const timer = setTimeout(() => controller.abort(), waitMs);
+
+      try {
+        const res = await fetch(targetUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + apiKey
+          },
+          body: JSON.stringify({
+            model: targetModel,
+            temperature: 0.2,
+            ...(fastTest ? { max_tokens: 40 } : {}),
+            messages: [
+              { role: 'system', content: sysPrompt },
+              { role: 'user', content: activePrompt }
+            ]
+          }),
+          signal: controller.signal
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          return { ok: false, status: res.status, data, text: '', finishReason: '' };
+        }
+
+        const choice = data.choices?.[0];
+        const text = choice?.message?.content || '';
+        const finishReason = choice?.finish_reason || 'stop';
+        if (!text.trim()) {
+          return { ok: false, status: 502, data: { error: { message: 'AI ບໍ່ສົ່ງເນື້ອຫາກັບມາ' } }, text: '', finishReason };
+        }
+        return { ok: true, status: 200, data, text, finishReason };
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          throw new Error(`ຕອບຊ້າເກີນ ${Math.round(waitMs / 1000)} ວິນາທີ`);
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    // ຖ້າບົດຍາວຫຼາຍຈົນຕິດຂີດຈຳກັດຄວາມຍາວ (MAX_TOKENS) ໃຫ້ສັ່ງຂຽນຕໍ່ອັດຕະໂນມັດຈົນຈົບ
+    async function runComplete(callerFn, label) {
+      let combined = '';
+      for (let part = 1; part <= 3; part++) {
+        const activePrompt = !combined
+          ? prompt
+          : `${prompt}\n\n---\nຂໍ້ຄວາມທີ່ຂຽນໄວ້ແລ້ວກ່ອນໜ້ານີ້ (ໃຫ້ຂຽນຕໍ່ຈາກບັນທັດສຸດທ້າຍນີ້ທັນທີ ຈົນຈົບຄົບທັງ 3 ພາກ ໂດຍບໍ່ຕ້ອງເລີ່ມຕົ້ນຫົວບົດໃໝ່):\n${combined.slice(-1000)}`;
+
+        if (part > 1) onProgress?.(`${label} ກຳລັງຂຽນຕໍ່ສ່ວນທີ ${part} ໃຫ້ຈົບ...`);
+        const r = await callerFn(activePrompt);
+        if (!r.ok) {
+          if (combined.length >= 250) return { ok: true, text: combined };
+          return r;
+        }
+
+        combined = combined ? `${combined}\n${r.text.trimStart()}` : r.text;
+        onChunk?.(combined);
+
+        if (fastTest || !/MAX_TOKENS|length/i.test(r.finishReason || '')) {
+          return { ok: true, text: combined };
+        }
+      }
+      return { ok: true, text: combined };
+    }
+
     let lastErr = '';
     let isQuotaExceeded = false;
-    let shouldFallback = false;
     const attemptLogs = [];
 
+    // 1. ລອງໃຊ້ API ຫຼັກ (Google Gemini ຫຼື Endpoint ທີ່ຕັ້ງໄວ້)
     for (let kIdx = 0; kIdx < keys.length; kIdx++) {
       const apiKey = keys[kIdx];
       const keyTag = keys.length > 1 ? ` [Key ${kIdx + 1}/${keys.length}]` : '';
-      let reason = '';
-      const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-      // 1. ລອງ Model ຫຼັກ (ສູງສຸດ 2 ຮອບ, ຖ້າຂາດຊ່ວງກາງຄັນຈະຂຽນຕໍ່ຈາກຈຸດເດີມທັນທີ)
-      for (let attempt = 1; attempt <= 2; attempt++) {
-        if (attempt > 1) {
-          onProgress?.(savedPrefix
-            ? `ກຳລັງໃຫ້ ${primaryModel}${keyTag} ຂຽນຕໍ່ຈາກຈຸດທີ່ຄ້າງ...`
-            : `ເຊີບເວີ ${primaryModel}${keyTag} ແອອັດ, ກຳລັງລອງໃໝ່...`);
-          await sleep(1000);
-        } else {
-          onProgress?.(`ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}${keyTag}...`);
-        }
-        try {
-          onModelUsed?.(primaryModel);
-          const { res, data, text } = await sendRequest(primaryModel, apiKey);
-          if (res.ok) return text;
-          const msg = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
-          if (res.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
-          shouldFallback = [400, 404, 429, 500, 502, 503].includes(res.status);
-          reason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : (res.status === 503 ? 'ແອອັດ 503' : (savedPrefix ? 'ຂາດຊ່ວງ' : `ລະຫັດ ${res.status}`));
-          lastErr = msg;
-          attemptLogs.push(`${primaryModel}: ${reason}`);
-          if (![502, 503].includes(res.status)) break;
-        } catch (err) {
-          shouldFallback = true;
-          reason = 'ຕອບຊ້າ';
-          lastErr = err.message;
-          attemptLogs.push(`${primaryModel}: ${reason}`);
-          if (attempt === 2) break;
-        }
-      }
+      const tryModel = async (targetModel) => {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          onProgress?.(attempt > 1
+            ? `${targetModel}${keyTag} ແອອັດຊົ່ວຄາວ, ກຳລັງລອງຊ້ຳ...`
+            : `ກຳລັງປະມວນຜົນດ້ວຍ ${targetModel}${keyTag}...`);
+          onModelUsed?.(targetModel);
+          if (attempt > 1) await sleep(2000);
 
-      // 2. ສະຫຼັບໄປໃຊ້ Model ທີ່ຕອບໄວ (ຕັດໂມເດວໃຫຍ່ 31B/27B/Pro ທີ່ຊ້າອອກ)
-      if (isGemini && shouldFallback) {
+          try {
+            const r = await runComplete(
+              p => isGemini ? sendGemini(targetModel, apiKey, p) : sendOpenAI(endpoint, targetModel, apiKey, p),
+              targetModel
+            );
+            if (r.ok) return { success: true, text: r.text };
+
+            const msg = r.data?.error?.message || ('API Error: ' + r.status);
+            if (r.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
+            lastErr = msg;
+
+            const reason = r.status === 429 ? 'ໂຄຕ້າເຕັມ' : (r.status === 503 ? 'ແອອັດ 503' : `ລະຫັດ ${r.status}`);
+            if ([500, 502, 503].includes(r.status) && attempt === 1) continue;
+            attemptLogs.push(`${targetModel}: ${reason}`);
+            return { success: false, status: r.status };
+          } catch (err) {
+            lastErr = err.message;
+            attemptLogs.push(`${targetModel}: ຕອບຊ້າ`);
+            return { success: false, status: 504 };
+          }
+        }
+        return { success: false, status: 503 };
+      };
+
+      // ລອງ Model ຫຼັກກ່ອນ
+      const primaryRes = await tryModel(primaryModel);
+      if (primaryRes.success) return primaryRes.text;
+
+      // ຖ້າເປັນ Google Gemini ໃຫ້ສະຫຼັບໄປ Model ສຳຮອງ (ລວມທັງ Gemma 3 ທີ່ໂຄຕ້າສູງ)
+      if (isGemini) {
         try {
-          onProgress?.(`${primaryModel}${keyTag} (${reason}), ກຳລັງສະຫຼັບ Model ທີ່ໄວກວ່າ...`);
+          onProgress?.(`ກຳລັງຄົ້ນຫາ Model ສຳຮອງຂອງ Google${keyTag}...`);
           const available = await fetchGeminiModels(apiKey);
           const rankModel = m => {
             let score = 0;
-            if (/^gemini-3\.5-flash-lite$/i.test(m)) score += 110;
+            if (/^gemini-3\.5-flash-lite$/i.test(m)) score += 115;
+            else if (/^gemini-3\.1-flash-lite$/i.test(m)) score += 110;
             else if (/^gemini-3\.5-flash$/i.test(m)) score += 105;
-            else if (/^gemini-2\.5-flash$/i.test(m)) score += 100;
+            else if (/gemma-3-27b-it$/i.test(m)) score += 95;
             else if (/gemma-3-12b-it$/i.test(m)) score += 90;
-            else if (/gemma-3-4b-it$/i.test(m)) score += 85;
+            else if (/gemma-3-4b-it$/i.test(m)) score += 80;
             else if (/flash/i.test(m)) score += 60;
             if (/preview/i.test(m)) score -= 35;
-            if (/(pro|31b|27b|latest|gemini-2\.0|2\.5-flash-lite)/i.test(m)) score -= 100; // ຫຼີກລ່ຽງໂມເດວຊ້າ ແລະ ໂມເດວທີ່ປິດແລ້ວ
+            if (/(pro|31b|latest|gemini-2\.0|gemini-2\.5)/i.test(m)) score -= 100;
             return score;
           };
+
           const backups = available
             .filter(m => m !== primaryModel && rankModel(m) > 0)
             .sort((a, b) => rankModel(b) - rankModel(a))
-            .slice(0, 3);
+            .slice(0, 4);
 
           for (const alt of backups) {
-            onProgress?.(savedPrefix
-              ? `ກຳລັງໃຫ້ ${alt}${keyTag} ຂຽນຕໍ່ໃຫ້ຈົບ...`
-              : `ກຳລັງສະຫຼັບໄປໃຊ້ ${alt}${keyTag}...`);
-            onModelUsed?.(alt);
-            await sleep(400);
-            try {
-              const { res, data, text } = await sendRequest(alt, apiKey);
-              if (res.ok) return text;
-              const altReason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : (res.status === 503 ? 'ແອອັດ 503' : `ລະຫັດ ${res.status}`);
-              attemptLogs.push(`${alt}: ${altReason}`);
-              if (data?.error?.message) lastErr = data.error.message;
-            } catch (e) {
-              attemptLogs.push(`${alt}: ຕອບຊ້າ`);
-            }
+            await sleep(500);
+            const altRes = await tryModel(alt);
+            if (altRes.success) return altRes.text;
           }
         } catch (_) {}
       }
     }
 
-    const summaryLog = [...new Set(attemptLogs)].slice(0, 4).join(', ');
-    if (isQuotaExceeded && !attemptLogs.some(l => l.includes('503'))) {
-      throw new Error('ໂຄຕ້າຟຣີຕໍ່ມື້ຂອງ API Key ນີ້ໝົດແລ້ວ. ແນະນຳໃຫ້ກົດ "ໃຊ້ Groq" ຫຼື ເພີ່ມ API Key ຈາກບັນຊີ Gmail ອື່ນ (' + summaryLog + ')');
+    // 2. ຖ້າ Google AI ລົ້ມເຫຼວທັງໝົດ ແຕ່ມີ Groq Backup Key -> ສະຫຼັບໄປ Groq ອັດຕະໂນມັດທັນທີ!
+    if (groqBackupKey) {
+      const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
+      const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+      for (const gm of groqModels) {
+        onProgress?.(`Google AI ບໍ່ວ່າງ — ກຳລັງສະຫຼັບໄປ Groq (${gm}) ອັດຕະໂນມັດ...`);
+        onModelUsed?.(`Groq: ${gm}`);
+        try {
+          const r = await runComplete(p => sendOpenAI(groqUrl, gm, groqBackupKey, p), `Groq (${gm})`);
+          if (r.ok) return r.text;
+          attemptLogs.push(`Groq ${gm}: ລະຫັດ ${r.status}`);
+        } catch (e) {
+          attemptLogs.push(`Groq ${gm}: ຕອບຊ້າ`);
+        }
+      }
     }
-    throw new Error(shouldFallback
-      ? `ເຊີບເວີ Google AI ແອອັດຊົ່ວຄາວ (${summaryLog}) — ແນະນຳໃຫ້ກົດ "ໃຊ້ Groq" ໃນແຖບຕັ້ງຄ່າ AI ຈະປະມວນຜົນຈົບໃນ 2 ວິນາທີ`
-      : lastErr);
+
+    const summaryLog = [...new Set(attemptLogs)].slice(0, 5).join(', ');
+    if (isQuotaExceeded && !attemptLogs.some(l => l.includes('503'))) {
+      throw new Error(`ໂຄຕ້າຟຣີຕໍ່ມື້ໝົດແລ້ວ (${summaryLog}) — ແນະນຳໃຫ້ໃສ່ Groq API Key ສຳຮອງໃນແຖບຕັ້ງຄ່າ AI`);
+    }
+    throw new Error(`ເຊີບເວີ AI ແອອັດຊົ່ວຄາວ (${summaryLog || lastErr}) — ແນະນຳໃຫ້ໃສ່ Groq API Key ສຳຮອງໃນແຖບຕັ້ງຄ່າ AI ຈະບໍ່ຕິດຂັດອີກ`);
   }
 
   // =========================================================
@@ -1369,7 +1360,8 @@
     const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
     $('endpoint').value = c.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
     $('apiKey').value = c.key || '';
-    $('model').value = c.model || 'gemini-2.5-flash';
+    $('groqBackupKey').value = c.groqBackupKey || '';
+    $('model').value = c.model || 'gemini-3.5-flash-lite';
     if (c.systemPrompt) $('systemPrompt').value = c.systemPrompt;
   }
 
@@ -1377,6 +1369,7 @@
     localStorage.setItem(CFG_KEY, JSON.stringify({
       endpoint: $('endpoint').value.trim(),
       key: $('apiKey').value.trim(),
+      groqBackupKey: $('groqBackupKey').value.trim(),
       model: $('model').value.trim(),
       systemPrompt: $('systemPrompt').value
     }));
