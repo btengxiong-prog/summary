@@ -1,0 +1,1082 @@
+<!DOCTYPE html>
+<html lang="lo">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ລະບົບສັງລວມບົດລາຍງານ (Firebase)</title>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+  <style>
+    /* ===== ຕົວແປສີຫຼັກ ===== */
+    :root {
+      --navy: #142b4a;
+      --blue: #2463a6;
+      --pale: #eef4fb;
+      --bg: #f4f7fb;
+      --ink: #1c2938;
+      --muted: #65758a;
+      --line: #dce4ee;
+      --green: #16845b;
+      --red: #c44949;
+    }
+
+    /* ===== ພື້ນຖານໜ້າເວັບ ===== */
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Phetsarath OT", "Noto Sans Lao", "Lao UI", Arial, sans-serif;
+      line-height: 1.65;
+    }
+
+    /* ===== ສ່ວນຫົວ (Header) ===== */
+    header {
+      background: linear-gradient(120deg, #122943, #245b91);
+      color: #fff;
+      padding: 22px max(18px, calc((100% - 1250px) / 2));
+      box-shadow: 0 3px 15px #132b4822;
+    }
+    header h1 { font-size: 23px; margin: 0 0 3px; }
+    header p { margin: 0; color: #d9e8f7; font-size: 13px; }
+
+    /* ===== ໂຄງສ້າງຫຼັກ (Layout) ===== */
+    .shell {
+      max-width: 1250px;
+      margin: 22px auto;
+      padding: 0 16px;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: 285px 1fr;
+      gap: 18px;
+      align-items: start;
+    }
+    .panel, .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 13px;
+      box-shadow: 0 4px 16px #203c5c09;
+    }
+    .panel { padding: 16px; position: sticky; top: 12px; }
+    .card { padding: 20px; margin-bottom: 16px; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+    /* ===== ຕົວໜັງສື ແລະ ຟອມ ===== */
+    h2 { font-size: 18px; margin: 0 0 13px; color: var(--navy); }
+    h3 { font-size: 15px; margin: 0 0 10px; color: var(--navy); }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 13px;
+      margin: 10px 0 5px;
+    }
+    input, select, textarea {
+      width: 100%;
+      border: 1px solid #ccd7e4;
+      border-radius: 8px;
+      padding: 10px 11px;
+      font: inherit;
+      font-size: 14px;
+      background: #fff;
+      color: var(--ink);
+    }
+    textarea { min-height: 155px; resize: vertical; }
+    input:focus, select:focus, textarea:focus {
+      outline: 2px solid #9fc5ed;
+      border-color: #4e8bc8;
+    }
+
+    /* ===== ປຸ່ມກົດ ===== */
+    button {
+      border: 0;
+      border-radius: 8px;
+      padding: 9px 13px;
+      font: inherit;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--blue);
+      color: #fff;
+    }
+    button:hover { filter: brightness(0.94); }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    button.secondary {
+      background: #eaf0f7;
+      color: #234365;
+      border: 1px solid #d7e1ed;
+    }
+    button.danger {
+      background: #fff0f0;
+      color: #a83333;
+      border: 1px solid #f0cccc;
+    }
+    button.green { background: var(--green); }
+    .actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+    }
+
+    /* ===== ແຖບເມນູ (Tabs) ===== */
+    .tabs {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin-bottom: 15px;
+    }
+    .tab { background: #e8eef5; color: #294867; }
+    .tab.active { background: var(--navy); color: #fff; }
+
+    /* ===== ລາຍການອາທິດ & ສະຖິຕິ ===== */
+    .weeklist {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+      margin-top: 12px;
+      max-height: 45vh;
+      overflow: auto;
+    }
+    .weekitem {
+      padding: 9px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      font-size: 12px;
+    }
+    .weekitem strong { display: block; }
+    .weekitem button {
+      padding: 4px 8px;
+      font-size: 11px;
+      margin: 5px 4px 0 0;
+    }
+    .stats { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .stat {
+      background: #f2f6fb;
+      border: 1px solid #e1e9f2;
+      border-radius: 9px;
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+    .stat b { color: var(--navy); font-size: 17px; margin-right: 4px; }
+
+    /* ===== ກ່ອງຜົນລັບ & ຂໍ້ຄວາມແຈ້ງເຕືອນ ===== */
+    #result {
+      min-height: 390px;
+      white-space: pre-wrap;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      padding: 16px;
+      background: #fff;
+      font-size: 14px;
+      line-height: 2;
+    }
+    .small { font-size: 12px; color: var(--muted); }
+    .hint {
+      background: #f1f6fc;
+      border-left: 3px solid #4d8bc5;
+      padding: 10px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      color: #435a72;
+      margin: 12px 0;
+    }
+    .status { font-size: 12px; color: var(--muted); margin-top: 8px; }
+    .status.ok { color: var(--green); }
+    .status.err { color: var(--red); }
+    .hidden { display: none !important; }
+    .footer {
+      text-align: center;
+      color: #8794a5;
+      font-size: 11px;
+      padding: 18px;
+    }
+
+    /* ===== ຮອງຮັບໜ້າຈໍມືຖື ===== */
+    @media (max-width: 850px) {
+      .layout { grid-template-columns: 1fr; }
+      .panel { position: static; }
+      .weeklist { max-height: 250px; }
+      .two { grid-template-columns: 1fr; }
+    }
+
+    /* ===== ຮູບແບບຕອນສັ່ງພິມ (Print / PDF) ===== */
+    @media print {
+      header, .panel, .tabs, .no-print, .footer { display: none !important; }
+      .shell { max-width: none; margin: 0; padding: 0; }
+      .layout { display: block; }
+      .card { border: 0; box-shadow: none; padding: 0; }
+      #result { border: 0; padding: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>ລະບົບສັງລວມບົດລາຍງານຜົນການປະຕິບັດວຽກ</h1>
+  <p>Weekly → Monthly → 3 / 6 / 9 / 12 Months | ບັນທຶກຂໍ້ມູນອອນລາຍຜ່ານ Firebase</p>
+</header>
+
+<div class="shell">
+  <div class="layout">
+
+    <!-- ==================== ແຖບດ້ານຊ້າຍ: ປ້ອນຂໍ້ມູນລາຍອາທິດ ==================== -->
+    <aside class="panel">
+      <h2>ຈັດການລາຍງານ</h2>
+
+      <label>ປີລາຍງານ</label>
+      <input id="year" type="number" min="2000" max="2200">
+
+      <label>ເດືອນ</label>
+      <select id="month">
+        <option value="1">ມັງກອນ</option>
+        <option value="2">ກຸມພາ</option>
+        <option value="3">ມີນາ</option>
+        <option value="4">ເມສາ</option>
+        <option value="5">ພຶດສະພາ</option>
+        <option value="6">ມິຖຸນາ</option>
+        <option value="7">ກໍລະກົດ</option>
+        <option value="8">ສິງຫາ</option>
+        <option value="9">ກັນຍາ</option>
+        <option value="10">ຕຸລາ</option>
+        <option value="11">ພະຈິກ</option>
+        <option value="12">ທັນວາ</option>
+      </select>
+
+      <label>ຊື່ວຽກງານ / ພາກສ່ວນ (ຖ້າມີ)</label>
+      <input id="department" placeholder="ຕົວຢ່າງ: ພະແນກ...">
+
+      <label>ອາທິດທີ</label>
+      <input id="weekNo" placeholder="ຕົວຢ່າງ: 1">
+
+      <label>ຫົວຂໍ້ລາຍງານ</label>
+      <input id="weekTitle" placeholder="ຕົວຢ່າງ: ຜົນການປະຊຸມ...">
+
+      <label>ເນື້ອໃນລາຍງານປະຈຳອາທິດ</label>
+      <textarea id="weekText" placeholder="ວາງເນື້ອໃນບົດສະຫຼຸບລາຍອາທິດຢູ່ບ່ອນນີ້..."></textarea>
+
+      <div class="actions">
+        <button id="saveWeek">ບັນທຶກອາທິດ</button>
+        <button class="secondary" id="clearForm">ລ້າງຟອມ</button>
+      </div>
+      <div id="dbStatus" class="status"></div>
+
+      <div class="actions" style="justify-content:space-between; align-items:center; margin-top:16px">
+        <h3 style="margin:0">ລາຍການອາທິດທີ່ບັນທຶກ</h3>
+        <button class="secondary" id="refreshDb" style="padding:4px 8px; font-size:11px">ໂຫຼດໃໝ່</button>
+      </div>
+      <div id="weekList" class="weeklist"></div>
+    </aside>
+
+    <!-- ==================== ແຖບດ້ານຂວາ: ເນື້ອໃນຫຼັກ ==================== -->
+    <main>
+      <div class="tabs no-print">
+        <button class="tab active" data-tab="summary">ສັງລວມລາຍງານ</button>
+        <button class="tab" data-tab="settings">ຕັ້ງຄ່າ AI</button>
+        <button class="tab" data-tab="backup">ສຳຮອງຂໍ້ມູນ</button>
+      </div>
+
+      <!-- ແຖບ 1: ສັງລວມລາຍງານ -->
+      <section id="summaryTab">
+        <div class="card">
+          <h2>ສ້າງບົດສະຫຼຸບຕາມໄລຍະ</h2>
+
+          <div class="two">
+            <div>
+              <label>ປີ</label>
+              <input id="sumYear" type="number">
+            </div>
+            <div>
+              <label>ປະເພດລາຍງານ</label>
+              <select id="period">
+                <option value="1">ປະຈຳເດືອນ</option>
+                <option value="3">3 ເດືອນ</option>
+                <option value="6">6 ເດືອນ</option>
+                <option value="9">9 ເດືອນ</option>
+                <option value="12">12 ເດືອນ</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="two">
+            <div>
+              <label>ເລີ່ມແຕ່ເດືອນ</label>
+              <select id="startMonth">
+                <option value="1">ມັງກອນ</option>
+                <option value="2">ກຸມພາ</option>
+                <option value="3">ມີນາ</option>
+                <option value="4">ເມສາ</option>
+                <option value="5">ພຶດສະພາ</option>
+                <option value="6">ມິຖຸນາ</option>
+                <option value="7">ກໍລະກົດ</option>
+                <option value="8">ສິງຫາ</option>
+                <option value="9">ກັນຍາ</option>
+                <option value="10">ຕຸລາ</option>
+                <option value="11">ພະຈິກ</option>
+                <option value="12">ທັນວາ</option>
+              </select>
+            </div>
+            <div>
+              <label>ຮູບແບບການຂຽນ</label>
+              <select id="style">
+                <option value="official">ພາສາລາຊະການ / ທາງການ</option>
+                <option value="concise">ກະຊັບ ແລະ ຊັດເຈນ</option>
+                <option value="detailed">ລະອຽດ ແລະ ຄົບຖ້ວນ</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="stats" id="stats"></div>
+
+          <div class="actions no-print">
+            <button id="generate" class="green">ສັງລວມບົດລາຍງານ</button>
+            <button id="clearResult" class="secondary">ລ້າງຜົນສະຫຼຸບ</button>
+          </div>
+          <div id="genStatus" class="status"></div>
+        </div>
+
+        <div class="card">
+          <div class="actions no-print" style="justify-content:space-between; margin-top:0">
+            <h2>ຜົນການສັງລວມ</h2>
+            <span class="small">ສາມາດແກ້ໄຂຂໍ້ຄວາມໄດ້</span>
+          </div>
+          <textarea id="result" placeholder="ຜົນການສັງລວມຈະສະແດງຢູ່ບ່ອນນີ້..."></textarea>
+          <div class="actions no-print">
+            <button id="copy">ຄັດລອກຂໍ້ຄວາມ</button>
+            <button class="secondary" id="downloadTxt">ດາວໂຫຼດ TXT</button>
+            <button class="secondary" id="print">ພິມ / Save PDF</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ແຖບ 2: ຕັ້ງຄ່າ AI -->
+      <section id="settingsTab" class="hidden">
+        <div class="card">
+          <h2>ຕັ້ງຄ່າ AI ສຳລັບສັງເຄາະເນື້ອໃນ</h2>
+          <div class="hint">
+            API Key ຈະຖືກເກັບໄວ້ສະເພາະໃນ Browser ຂອງເຄື່ອງນີ້ເພື່ອຄວາມປອດໄພ, ສ່ວນຂໍ້ມູນລາຍງານທັງໝົດຈະຖືກເກັບໄວ້ໃນ Supabase.
+          </div>
+
+          <label>API Endpoint (ຄ່າເລີ່ມຕົ້ນ Google Gemini)</label>
+          <input id="endpoint" value="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions">
+
+          <label>API Key</label>
+          <input id="apiKey" type="password" placeholder="ວາງ API Key ຂອງທ່ານ">
+
+          <label>Model</label>
+          <div style="display:flex; gap:8px; align-items:center">
+            <input id="model" value="gemini-3.8-flash" style="flex:1">
+            <button type="button" class="secondary" id="loadModels" style="white-space:nowrap">ດຶງລາຍຊື່ Model</button>
+          </div>
+          <select id="modelPicker" class="hidden" style="margin-top:6px"></select>
+
+          <label>ຄຳແນະນຳໃຫ້ AI</label>
+          <textarea id="systemPrompt" style="min-height:120px">ທ່ານແມ່ນຜູ້ຊ່ຽວຊານດ້ານການຂຽນລາຍງານລາຊະການພາສາລາວ. ຈົ່ງສັງເຄາະບົດລາຍງານຕົ້ນສະບັບໃຫ້ເປັນບົດສະຫຼຸບທາງການ, ຈັດລຳດັບຄວາມຄິດໃຫ້ດີ, ລວມປະເດັນທີ່ຊ້ຳກັນ, ຮັກສາລາຍລະອຽດສຳຄັນ. ຫ້າມແຕ່ງຂໍ້ມູນ, ວັນທີ, ຕົວເລກ, ຜົນສຳເລັດ ຫຼື ເຫດການທີ່ບໍ່ມີໃນຕົ້ນສະບັບ. ຖ້າຂໍ້ມູນບໍ່ພຽງພໍ ຢ່າຄາດເດົາ.</textarea>
+
+          <div class="actions">
+            <button id="saveSettings">ບັນທຶກການຕັ້ງຄ່າ</button>
+            <button class="secondary" id="testAI">ທົດສອບ AI</button>
+          </div>
+          <div id="aiStatus" class="status"></div>
+        </div>
+      </section>
+
+      <!-- ແຖບ 3: ສຳຮອງຂໍ້ມູນ -->
+      <section id="backupTab" class="hidden">
+        <div class="card">
+          <h2>ສຳຮອງ ແລະ ກູ້ຄືນຂໍ້ມູນ (JSON)</h2>
+          <p class="small">
+            ສົ່ງອອກຂໍ້ມູນຈາກ Supabase ເປັນໄຟລ໌ JSON ເພື່ອເກັບສຳຮອງໄວ້ໃນຄອມພິວເຕີ ຫຼື ນຳເຂົ້າຂໍ້ມູນເກົ່າຂຶ້ນ Supabase.
+          </p>
+          <div class="actions">
+            <button id="exportJson">ສົ່ງອອກ JSON</button>
+            <label style="margin:0">
+              <input id="importJson" type="file" accept=".json,application/json" style="max-width:230px">
+            </label>
+            <button class="danger" id="deleteAll">ລຶບຂໍ້ມູນທັງໝົດໃນຖານຂໍ້ມູນ</button>
+          </div>
+          <div id="backupStatus" class="status"></div>
+        </div>
+      </section>
+    </main>
+
+  </div>
+  <div class="footer">ລະບົບເຊື່ອມຕໍ່ຖານຂໍ້ມູນ Supabase · ຂໍ້ມູນຊິ້ງອອນລາຍທຸກອຸປະກອນ</div>
+</div>
+
+<script>
+  // =========================================================
+  // 1. ຕັ້ງຄ່າ FIREBASE (Firestore)
+  // =========================================================
+  const firebaseConfig = {
+    apiKey: "AIzaSyBkW5AFvk2dOue21tPS3NbH1x_9BlPR0UA",
+    authDomain: "summary-c20da.firebaseapp.com",
+    projectId: "summary-c20da",
+    storageBucket: "summary-c20da.firebasestorage.app",
+    messagingSenderId: "79071563039",
+    appId: "1:79071563039:web:51683eadb8322bebf6b42a",
+    measurementId: "G-XV1GE7J8MB"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+  const reportsCol = db.collection('weekly_reports');
+
+  // =========================================================
+  // 2. ຕົວແປ ແລະ ຟັງຊັນຊ່ວຍເຫຼືອ (Helpers)
+  // =========================================================
+  const $ = id => document.getElementById(id);
+  const CFG_KEY = 'lao_report_ai_v1';
+  const MONTHS = [
+    'ມັງກອນ', 'ກຸມພາ', 'ມີນາ', 'ເມສາ', 'ພຶດສະພາ', 'ມິຖຸນາ',
+    'ກໍລະກົດ', 'ສິງຫາ', 'ກັນຍາ', 'ຕຸລາ', 'ພະຈິກ', 'ທັນວາ'
+  ];
+
+  let records = [];
+  let editingId = null;
+
+  function esc(str) {
+    return String(str ?? '').replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function setStatus(id, msg, type = '') {
+    $(id).textContent = msg;
+    $(id).className = 'status ' + type;
+  }
+
+  function clearForm() {
+    editingId = null;
+    ['weekNo', 'weekTitle', 'weekText'].forEach(id => $(id).value = '');
+    $('saveWeek').textContent = 'ບັນທຶກອາທິດ';
+  }
+
+  function downloadFile(name, data, type) {
+    const a = document.createElement('a');
+    const url = URL.createObjectURL(new Blob([data], { type }));
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // =========================================================
+  // 3. ການຈັດການຖານຂໍ້ມູນ FIREBASE (Firestore)
+  // =========================================================
+  async function loadRecords() {
+    setStatus('dbStatus', 'ກຳລັງໂຫຼດຂໍ້ມູນຈາກ Firebase...');
+    try {
+      const snap = await reportsCol.get();
+      records = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      renderWeekList();
+      setStatus('dbStatus', `ເຊື່ອມຕໍ່ Firebase ແລ້ວ (${records.length} ລາຍການ)`, 'ok');
+    } catch (error) {
+      setStatus('dbStatus', 'ໂຫຼດຂໍ້ມູນບໍ່ສຳເລັດ: ' + error.message, 'err');
+    }
+  }
+
+  async function saveWeekRecord() {
+    const year = +$('year').value;
+    const month = +$('month').value;
+    const week = $('weekNo').value.trim();
+    const text = $('weekText').value.trim();
+
+    if (!year || !week || !text) {
+      return alert('ກະລຸນາປ້ອນປີ, ອາທິດ ແລະ ເນື້ອໃນລາຍງານ');
+    }
+
+    const row = {
+      id: editingId || ('w' + Date.now() + Math.random().toString(16).slice(2)),
+      year,
+      month,
+      week,
+      title: $('weekTitle').value.trim(),
+      department: $('department').value.trim(),
+      text,
+      updated: new Date().toISOString()
+    };
+
+    $('saveWeek').disabled = true;
+    setStatus('dbStatus', 'ກຳລັງບັນທຶກລົງ Firebase...');
+
+    try {
+      await reportsCol.doc(row.id).set(row);
+
+      if (editingId) {
+        records = records.map(r => (r.id === editingId ? row : r));
+      } else {
+        records.push(row);
+      }
+
+      clearForm();
+      renderWeekList();
+      setStatus('dbStatus', 'ບັນທຶກລົງ Firebase ສຳເລັດ', 'ok');
+    } catch (error) {
+      setStatus('dbStatus', 'ບັນທຶກບໍ່ສຳເລັດ: ' + error.message, 'err');
+    } finally {
+      $('saveWeek').disabled = false;
+    }
+  }
+
+  window.editRecord = function (id) {
+    const r = records.find(x => x.id === id);
+    if (!r) return;
+
+    editingId = id;
+    $('year').value = r.year;
+    $('month').value = r.month;
+    $('weekNo').value = r.week;
+    $('weekTitle').value = r.title || '';
+    $('weekText').value = r.text || '';
+    $('department').value = r.department || '';
+    $('saveWeek').textContent = 'ບັນທຶກການແກ້ໄຂ';
+
+    renderWeekList();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  window.deleteRecord = async function (id) {
+    if (!confirm('ຢືນຢັນລຶບລາຍງານອາທິດນີ້ອອກຈາກ Firebase?')) return;
+
+    setStatus('dbStatus', 'ກຳລັງລຶບຂໍ້ມູນ...');
+    try {
+      await reportsCol.doc(id).delete();
+      records = records.filter(x => x.id !== id);
+      renderWeekList();
+      setStatus('dbStatus', 'ລຶບລາຍງານສຳເລັດ', 'ok');
+    } catch (error) {
+      setStatus('dbStatus', 'ລຶບບໍ່ສຳເລັດ: ' + error.message, 'err');
+    }
+  };
+
+  // =========================================================
+  // 4. ການສະແດງຜົນລາຍການ ແລະ ສະຖິຕິ (UI Rendering)
+  // =========================================================
+  function renderWeekList() {
+    const y = +$('year').value;
+    const m = +$('month').value;
+    const list = records
+      .filter(r => r.year === y && r.month === m)
+      .sort((a, b) => Number(a.week) - Number(b.week));
+
+    if (!list.length) {
+      $('weekList').innerHTML = '<div class="small">ຍັງບໍ່ມີລາຍງານໃນເດືອນນີ້</div>';
+    } else {
+      $('weekList').innerHTML = list.map(r => `
+        <div class="weekitem">
+          <strong>ອາທິດ ${esc(r.week)} · ${esc(r.title || 'ບໍ່ມີຫົວຂໍ້')}</strong>
+          <span>${esc(r.text.slice(0, 90))}${r.text.length > 90 ? '…' : ''}</span>
+          <br>
+          <button class="secondary" onclick="editRecord('${r.id}')">ແກ້ໄຂ</button>
+          <button class="danger" onclick="deleteRecord('${r.id}')">ລຶບ</button>
+        </div>
+      `).join('');
+    }
+    updateStats();
+  }
+
+  function getSelectedRange() {
+    const y = +$('sumYear').value;
+    const n = +$('period').value;
+    const start = +$('startMonth').value;
+    const months = [];
+
+    for (let i = 0; i < n; i++) {
+      const d = new Date(y, start - 1 + i, 1);
+      months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
+    }
+    return { y, n, start, months };
+  }
+
+  function getSelectedRecords() {
+    const { months } = getSelectedRange();
+    return records
+      .filter(r => months.some(m => m.year === r.year && m.month === r.month))
+      .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week) - Number(b.week));
+  }
+
+  function updateStats() {
+    if (!$('stats')) return;
+    const { n } = getSelectedRange();
+    const rs = getSelectedRecords();
+    const activeMonths = new Set(rs.map(r => `${r.year}-${r.month}`)).size;
+    const totalChars = rs.reduce((sum, r) => sum + r.text.length, 0).toLocaleString();
+
+    $('stats').innerHTML = `
+      <div class="stat"><b>${rs.length}</b> ບົດອາທິດ</div>
+      <div class="stat"><b>${n}</b> ເດືອນ</div>
+      <div class="stat"><b>${activeMonths}</b> ເດືອນທີ່ມີຂໍ້ມູນ</div>
+      <div class="stat"><b>${totalChars}</b> ຕົວອັກສອນ</div>
+    `;
+  }
+
+  // =========================================================
+  // 5. ການສັງລວມບົດລາຍງານ ແລະ ເຊື່ອມຕໍ່ AI
+  // =========================================================
+  function periodName(n) {
+    return n === 1 ? 'ປະຈຳເດືອນ' : `${n} ເດືອນ`;
+  }
+
+  function buildPrompt(rs) {
+    const { y, n, start, months } = getSelectedRange();
+    const end = months[months.length - 1];
+    const style = $('style').value;
+
+    const styleMap = {
+      concise: 'ຂຽນໃຫ້ກະຊັບ ແຕ່ຄົບປະເດັນ.',
+      detailed: 'ຂຽນລະອຽດ ຈັດໝວດວຽກງານ ແລະ ຮັກສາລາຍລະອຽດສຳຄັນ.',
+      official: 'ໃຊ້ສຳນວນພາສາລາຊະການທາງການ ສຸພາບ ແລະ ໜັກແໜ້ນ.'
+    };
+
+    const grouped = months.map(m => {
+      const items = rs.filter(r => r.year === m.year && r.month === m.month);
+      const body = items.length
+        ? items.map(r => `[ອາທິດ ${r.week}${r.title ? ' | ' + r.title : ''}]\n${r.text}`).join('\n\n')
+        : '[ບໍ່ມີຂໍ້ມູນລາຍງານໃນເດືອນນີ້]';
+      return `\n### ${MONTHS[m.month - 1]} ${m.year}\n${body}`;
+    }).join('\n');
+
+    return [
+      `ຈົ່ງສັງເຄາະບົດລາຍງານລາຍອາທິດຕໍ່ໄປນີ້ ໃຫ້ເປັນບົດສະຫຼຸບ${periodName(n)} ສຳລັບໄລຍະ ${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}. ${styleMap[style]}`,
+      '',
+      'ຫຼັກການ:',
+      '1. ອ່ານທຸກອາທິດ ແລະ ທຸກເດືອນກ່ອນສັງເຄາະ.',
+      '2. ລວມປະເດັນທີ່ຊ້ຳກັນ ແລະ ຈັດໝວດວຽກງານທີ່ກ່ຽວຂ້ອງ.',
+      '3. ບໍ່ລຽງລາຍງານອາທິດຕໍ່ກັນຊື່ໆ; ຕ້ອງຂຽນເປັນບົດລາຍງານໃໝ່ທີ່ອ່ານລື່ນໄຫຼ.',
+      '4. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ, ຕົວເລກ ຫຼື ເຫດການທີ່ບໍ່ປາກົດໃນຂໍ້ມູນ.',
+      '5. ຮັກສາຊື່ສະເພາະ, ຕົວເລກ ແລະ ຂໍ້ມູນສຳຄັນໃຫ້ຖືກຕ້ອງ.',
+      '6. ຈັດຮູບແບບມີຫົວຂໍ້, ເນື້ອໃນຫຼັກ, ບັນຫາ/ຂໍ້ຄົງຄ້າງ (ຖ້າມີ), ແລະ ທິດທາງຕໍ່ໄປ.',
+      '7. ຕອບເປັນພາສາລາວທາງການ.',
+      '',
+      'ຂໍ້ມູນຕົ້ນສະບັບ:',
+      grouped
+    ].join('\n');
+  }
+
+  function fallbackSummary(rs) {
+    const { y, n, start, months } = getSelectedRange();
+    const endMonth = MONTHS[months[months.length - 1].month - 1];
+
+    const grouped = months.map(m => {
+      const items = rs.filter(r => r.year === m.year && r.month === m.month);
+      const body = items.length ? items.map(r => r.text.trim()).join(' ') : 'ບໍ່ມີຂໍ້ມູນລາຍງານ.';
+      return `${MONTHS[m.month - 1]} ${m.year}: ${body}`;
+    }).join('\n\n');
+
+    return `ບົດສະຫຼຸບຜົນການປະຕິບັດວຽກ${periodName(n)}\nໄລຍະ: ${MONTHS[start - 1]} ຫາ ${endMonth} ${y}\n\n${grouped}\n\nໝາຍເຫດ: ນີ້ແມ່ນການລວມຂໍ້ຄວາມພື້ນຖານ (ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ AI).`;
+  }
+
+  let cachedGeminiKey = '';
+  let cachedGeminiModels = null;
+
+  async function fetchGeminiModels(apiKey, forceRefresh = false) {
+    if (!forceRefresh && cachedGeminiModels && cachedGeminiKey === apiKey) {
+      return cachedGeminiModels;
+    }
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error?.message || ('API Error: ' + res.status));
+    cachedGeminiKey = apiKey;
+    cachedGeminiModels = (data.models || [])
+      .filter(m =>
+        m.supportedGenerationMethods?.includes('generateContent') &&
+        /gemini/i.test(m.name) &&
+        !/(embedding|image|tts|audio|vision|robotics|computer-use|live)/i.test(m.name)
+      )
+      .map(m => m.name.replace(/^models\//, ''));
+    return cachedGeminiModels;
+  }
+
+  async function callAI(prompt, { onProgress = null, onChunk = null, timeoutMs = 15000, fastTest = false } = {}) {
+    const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    if (!cfg.key) throw new Error('ຍັງບໍ່ໄດ້ປ້ອນ API Key');
+
+    const endpoint = cfg.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    const primaryModel = (cfg.model || 'gemini-2.5-flash').trim();
+    const sysPrompt = fastTest
+      ? 'ຕອບສັ້ນໆ ຕາມຄຳສັ່ງ.'
+      : (cfg.systemPrompt || 'ຊ່ວຍສັງເຄາະລາຍງານພາສາລາວ ໂດຍບໍ່ແຕ່ງຂໍ້ມູນ.');
+    const isGemini = endpoint.includes('generativelanguage.googleapis.com');
+
+    async function sendRequest(targetModel) {
+      const useStream = isGemini && typeof onChunk === 'function';
+      const url = isGemini
+        ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:${useStream ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${encodeURIComponent(cfg.key)}`
+        : endpoint;
+
+      const headers = isGemini
+        ? { 'Content-Type': 'application/json' }
+        : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key };
+
+      const genConfig = { temperature: 0.2 };
+      if (fastTest) genConfig.maxOutputTokens = 30;
+      if (/2\.5-flash/i.test(targetModel)) {
+        genConfig.thinkingConfig = { thinkingBudget: 0 };
+      }
+
+      const payload = isGemini
+        ? {
+            system_instruction: { parts: [{ text: sysPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: genConfig
+          }
+        : {
+            model: targetModel,
+            temperature: 0.2,
+            ...(fastTest ? { max_tokens: 30 } : {}),
+            messages: [
+              { role: 'system', content: sysPrompt },
+              { role: 'user', content: prompt }
+            ]
+          };
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload),
+          signal: controller.signal
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          return { res, data, text: '' };
+        }
+
+        // ສະແດງຂໍ້ຄວາມໄຫຼອອກມາທັນທີ (Streaming)
+        if (useStream && res.body) {
+          clearTimeout(timer);
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          let fullText = '';
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith('data:')) continue;
+              const jsonStr = trimmed.slice(5).trim();
+              if (!jsonStr || jsonStr === '[DONE]') continue;
+              try {
+                const chunk = JSON.parse(jsonStr);
+                const parts = chunk.candidates?.[0]?.content?.parts || [];
+                const delta = parts.filter(p => !p.thought && p.text).map(p => p.text).join('');
+                if (delta) {
+                  fullText += delta;
+                  onChunk(fullText);
+                }
+              } catch (_) {}
+            }
+          }
+          return { res, data: {}, text: fullText || 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ.' };
+        }
+
+        const data = await res.json().catch(() => ({}));
+        const text = isGemini
+          ? (data.candidates?.[0]?.content?.parts?.filter(p => !p.thought && p.text).map(p => p.text).join('') || 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ.')
+          : (data.choices?.[0]?.message?.content || 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ.');
+        return { res, data, text };
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          throw new Error(`ເຊື່ອມຕໍ່ໝົດເວລາ (${timeoutMs / 1000} ວິນາທີ)`);
+        }
+        throw err;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    // ລອງເຊື່ອມຕໍ່ Model ຫຼັກກ່ອນ 1 ຄັ້ງ (ຖ້າຊ້າ ຫຼື ແອອັດ ໃຫ້ສະຫຼັບທັນທີບໍ່ຕ້ອງລໍຊ້ຳ)
+    let lastErr = '';
+    let reason = '';
+    let shouldFallback = false;
+    onProgress?.(`ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}...`);
+    try {
+      const { res, data, text } = await sendRequest(primaryModel);
+      if (res.ok) return text;
+      shouldFallback = [400, 404, 429, 500, 503].includes(res.status);
+      reason = `ລະຫັດ ${res.status}`;
+      lastErr = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
+    } catch (err) {
+      shouldFallback = true;
+      reason = 'ຕອບຊ້າ';
+      lastErr = err.message;
+    }
+
+    // ສະຫຼັບໄປ Model ທີ່ໄວ ແລະ ສະຖຽນທີ່ສຸດ (ຫຼີກລ້ຽງ preview/exp/pro) ແລ້ວບັນທຶກຈື່ໄວ້ອັດຕະໂນມັດ
+    if (isGemini && shouldFallback) {
+      try {
+        onProgress?.(`${primaryModel} (${reason}), ກຳລັງສະຫຼັບໄປ Model ທີ່ໄວກວ່າ...`);
+        const available = await fetchGeminiModels(cfg.key);
+        const rankModel = m => {
+          let score = 0;
+          if (/flash-lite/i.test(m)) score += 5;
+          else if (/flash/i.test(m)) score += 3;
+          if (/2\.5/i.test(m)) score += 2;
+          if (/latest/i.test(m)) score -= 2;
+          if (/(preview|exp|pro|thinking)/i.test(m)) score -= 4;
+          return score;
+        };
+        const backups = available
+          .filter(m => m !== primaryModel)
+          .sort((a, b) => rankModel(b) - rankModel(a))
+          .slice(0, 3);
+
+        for (const alt of backups) {
+          onProgress?.(`ກຳລັງສະຫຼັບໄປໃຊ້ ${alt}...`);
+          try {
+            const { res, text } = await sendRequest(alt);
+            if (res.ok) {
+              $('model').value = alt;
+              localStorage.setItem(CFG_KEY, JSON.stringify({ ...cfg, model: alt }));
+              return text;
+            }
+          } catch (_) {}
+        }
+      } catch (_) {}
+    }
+
+    throw new Error(shouldFallback
+      ? 'ເຊີບເວີ AI ແອອັດຊົ່ວຄາວ, ກະລຸນາກົດ "ດຶງລາຍຊື່ Model" ເພື່ອເລືອກຕົວອື່ນ (' + lastErr + ')'
+      : lastErr);
+  }
+
+  // =========================================================
+  // 6. ການເຊື່ອມຕໍ່ປຸ່ມກົດທັງໝົດ (Event Listeners)
+  // =========================================================
+  $('saveWeek').onclick = saveWeekRecord;
+  $('refreshDb').onclick = loadRecords;
+  $('clearForm').onclick = clearForm;
+  $('year').onchange = renderWeekList;
+  $('month').onchange = renderWeekList;
+  $('sumYear').onchange = updateStats;
+  $('period').onchange = updateStats;
+  $('startMonth').onchange = updateStats;
+
+  $('generate').onclick = async () => {
+    const rs = getSelectedRecords();
+    if (!rs.length) {
+      return setStatus('genStatus', 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.', 'err');
+    }
+
+    $('generate').disabled = true;
+    const startTime = Date.now();
+    let currentMsg = 'ກຳລັງກວດສອບຂໍ້ມູນ ແລະ ສັງເຄາະ...';
+    const showProgress = msg => {
+      if (msg) currentMsg = msg;
+      const sec = Math.floor((Date.now() - startTime) / 1000);
+      setStatus('genStatus', `${currentMsg} (${sec} ວິນາທີ)`);
+    };
+    showProgress();
+    const tick = setInterval(() => showProgress(), 1000);
+
+    try {
+      const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+      if (cfg.key) $('result').value = '';
+      const output = cfg.key
+        ? await callAI(buildPrompt(rs), {
+            onProgress: msg => showProgress(msg),
+            onChunk: txt => {
+              $('result').value = txt;
+              showProgress(`AI (${$('model').value}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
+            },
+            timeoutMs: 12000
+          })
+        : fallbackSummary(rs);
+      $('result').value = output;
+      const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
+      setStatus(
+        'genStatus',
+        cfg.key
+          ? `ສັງເຄາະດ້ວຍ AI (${$('model').value}) ສຳເລັດໃນ ${totalSec} ວິນາທີ. ກະລຸນາກວດທານກ່ອນນຳໃຊ້.`
+          : 'ສ້າງຜົນລວມພື້ນຖານແລ້ວ (ຍັງບໍ່ໄດ້ໃຊ້ AI).',
+        'ok'
+      );
+    } catch (e) {
+      setStatus('genStatus', 'ເກີດຂໍ້ຜິດພາດ: ' + e.message, 'err');
+    } finally {
+      clearInterval(tick);
+      $('generate').disabled = false;
+    }
+  };
+
+  $('clearResult').onclick = () => {
+    $('result').value = '';
+    setStatus('genStatus', '');
+  };
+
+  $('copy').onclick = async () => {
+    if (!$('result').value) return;
+    try {
+      await navigator.clipboard.writeText($('result').value);
+      setStatus('genStatus', 'ຄັດລອກສຳເລັດ', 'ok');
+    } catch {
+      $('result').select();
+      document.execCommand('copy');
+      setStatus('genStatus', 'ຄັດລອກແລ້ວ', 'ok');
+    }
+  };
+
+  $('downloadTxt').onclick = () => downloadFile('ບົດສະຫຼຸບ.txt', $('result').value, 'text/plain;charset=utf-8');
+  $('print').onclick = () => window.print();
+
+  // ຕັ້ງຄ່າ AI
+  function loadAISettings() {
+    const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
+    $('endpoint').value = c.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    $('apiKey').value = c.key || '';
+    $('model').value = c.model || 'gemini-3.8-flash';
+    if (c.systemPrompt) $('systemPrompt').value = c.systemPrompt;
+  }
+
+  $('saveSettings').onclick = () => {
+    localStorage.setItem(CFG_KEY, JSON.stringify({
+      endpoint: $('endpoint').value.trim(),
+      key: $('apiKey').value.trim(),
+      model: $('model').value.trim(),
+      systemPrompt: $('systemPrompt').value
+    }));
+    setStatus('aiStatus', 'ບັນທຶກການຕັ້ງຄ່າແລ້ວ', 'ok');
+  };
+
+  $('testAI').onclick = async () => {
+    $('testAI').disabled = true;
+    try {
+      $('saveSettings').click();
+      const reply = await callAI('ຕອບພຽງຄຳວ່າ: ທົດສອບສຳເລັດ', {
+        onProgress: msg => setStatus('aiStatus', msg),
+        timeoutMs: 12000,
+        fastTest: true
+      });
+      setStatus('aiStatus', `ເຊື່ອມຕໍ່ສຳເລັດ (${$('model').value}): ` + reply.slice(0, 120), 'ok');
+    } catch (e) {
+      setStatus('aiStatus', 'ທົດສອບບໍ່ສຳເລັດ: ' + e.message, 'err');
+    } finally {
+      $('testAI').disabled = false;
+    }
+  };
+
+  $('loadModels').onclick = async () => {
+    const key = $('apiKey').value.trim();
+    if (!key) return setStatus('aiStatus', 'ກະລຸນາວາງ API Key ກ່ອນ', 'err');
+    $('loadModels').disabled = true;
+    setStatus('aiStatus', 'ກຳລັງດຶງລາຍຊື່ Model ທີ່ໃຊ້ໄດ້ຈາກ Google...');
+    try {
+      const list = await fetchGeminiModels(key);
+      if (!list.length) throw new Error('ບໍ່ພົບ Model ທີ່ຮອງຮັບ');
+      $('modelPicker').innerHTML =
+        '<option value="">-- ເລືອກ Model ທີ່ຕ້ອງການ --</option>' +
+        list.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+      $('modelPicker').classList.remove('hidden');
+      setStatus('aiStatus', `ພົບ ${list.length} Model ທີ່ໃຊ້ໄດ້ — ເລືອກປ່ຽນຈາກລາຍການດ້ານເທິງໄດ້ເລີຍ`, 'ok');
+    } catch (e) {
+      setStatus('aiStatus', 'ດຶງລາຍຊື່ Model ບໍ່ສຳເລັດ: ' + e.message, 'err');
+    } finally {
+      $('loadModels').disabled = false;
+    }
+  };
+
+  $('modelPicker').onchange = () => {
+    if ($('modelPicker').value) {
+      $('model').value = $('modelPicker').value;
+      $('saveSettings').click();
+    }
+  };
+
+  // ສຳຮອງ / ກູ້ຄືນ JSON
+  $('exportJson').onclick = () => {
+    const payload = JSON.stringify({ records, exportedAt: new Date().toISOString() }, null, 2);
+    downloadFile('weekly-reports-backup.json', payload, 'application/json');
+  };
+
+  $('importJson').onchange = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    try {
+      const parsed = JSON.parse(await file.text());
+      const incoming = Array.isArray(parsed) ? parsed : parsed.records;
+      if (!Array.isArray(incoming)) throw new Error('ຮູບແບບໄຟລ໌ບໍ່ຖືກຕ້ອງ');
+      if (!confirm(`ນຳເຂົ້າ ${incoming.length} ລາຍການຂຶ້ນ Firebase?`)) return;
+
+      setStatus('backupStatus', 'ກຳລັງອັບໂຫຼດຂໍ້ມູນຂຶ້ນ Firebase...');
+      const rows = incoming.map(r => ({
+        id: r.id || ('imp' + Date.now() + Math.random().toString(16).slice(2)),
+        year: Number(r.year),
+        month: Number(r.month),
+        week: String(r.week),
+        title: r.title || '',
+        department: r.department || '',
+        text: r.text || '',
+        updated: r.updated || new Date().toISOString()
+      }));
+
+      for (let i = 0; i < rows.length; i += 450) {
+        const batch = db.batch();
+        rows.slice(i, i + 450).forEach(row => {
+          batch.set(reportsCol.doc(row.id), row);
+        });
+        await batch.commit();
+      }
+
+      await loadRecords();
+      setStatus('backupStatus', `ນຳເຂົ້າ ${rows.length} ລາຍການຂຶ້ນ Firebase ສຳເລັດ`, 'ok');
+    } catch (err) {
+      setStatus('backupStatus', 'ຜິດພາດ: ' + err.message, 'err');
+    }
+    e.target.value = '';
+  };
+
+  $('deleteAll').onclick = async () => {
+    if (!confirm('ລຶບລາຍງານທັງໝົດອອກຈາກ Firebase ແທ້ບໍ? ຂໍ້ມູນຈະຫາຍໄປຈາກທຸກເຄື່ອງ!')) return;
+
+    setStatus('backupStatus', 'ກຳລັງລຶບຂໍ້ມູນທັງໝົດ...');
+    try {
+      const snap = await reportsCol.get();
+      for (let i = 0; i < snap.docs.length; i += 450) {
+        const batch = db.batch();
+        snap.docs.slice(i, i + 450).forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+      }
+      records = [];
+      renderWeekList();
+      setStatus('backupStatus', 'ລຶບຂໍ້ມູນທັງໝົດແລ້ວ', 'ok');
+    } catch (error) {
+      setStatus('backupStatus', 'ຜິດພາດ: ' + error.message, 'err');
+    }
+  };
+
+  // ສະຫຼັບແຖບເມນູ (Tabs)
+  document.querySelectorAll('.tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === btn));
+      ['summary', 'settings', 'backup'].forEach(t => {
+        $(t + 'Tab').classList.toggle('hidden', t !== btn.dataset.tab);
+      });
+    };
+  });
+
+  // =========================================================
+  // 7. ເລີ່ມຕົ້ນລະບົບ (Initialization)
+  // =========================================================
+  const now = new Date();
+  $('year').value = now.getFullYear();
+  $('sumYear').value = now.getFullYear();
+  $('month').value = now.getMonth() + 1;
+  $('startMonth').value = 1;
+
+  loadAISettings();
+  loadRecords();
+</script>
+</body>
+</html>
