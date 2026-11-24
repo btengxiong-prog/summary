@@ -358,11 +358,16 @@
             API Key ຈະຖືກເກັບໄວ້ສະເພາະໃນ Browser ຂອງເຄື່ອງນີ້ເພື່ອຄວາມປອດໄພ, ສ່ວນຂໍ້ມູນລາຍງານທັງໝົດຈະຖືກເກັບໄວ້ໃນ Supabase.
           </div>
 
+          <div class="actions" style="margin-top:0; margin-bottom:10px">
+            <button type="button" class="secondary" id="presetGemini">ໃຊ້ Google Gemini</button>
+            <button type="button" class="secondary" id="presetGroq">ໃຊ້ Groq (ຟຣີ · ໄວ · ໂຄຕ້າສູງ)</button>
+          </div>
+
           <label>API Endpoint (ຄ່າເລີ່ມຕົ້ນ Google Gemini)</label>
           <input id="endpoint" value="https://generativelanguage.googleapis.com/v1beta/openai/chat/completions">
 
-          <label>API Key</label>
-          <input id="apiKey" type="password" placeholder="ວາງ API Key ຂອງທ່ານ">
+          <label>API Key (ສາມາດໃສ່ຫຼາຍ Key ຄັ່ນດ້ວຍເຄື່ອງໝາຍ , ເພື່ອສະຫຼັບອັດຕະໂນມັດ)</label>
+          <input id="apiKey" type="password" placeholder="ວາງ API Key ຂອງທ່ານ (ຫຼື key1, key2)">
 
           <label>Model</label>
           <div style="display:flex; gap:8px; align-items:center">
@@ -460,6 +465,19 @@
     a.download = name;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  function cleanOutput(text) {
+    return String(text || '')
+      .replace(/ប្រຊາທິປະໄຕ/g, 'ປະຊາທິປະໄຕ')
+      .replace(/[\u1780-\u17FF]+/g, '')          // ລຶບຕົວອັກສອນຂະແມທີ່ອາດຫຼົງປົນມາ
+      .replace(/^\s*#{1,6}\s*/gm, '')           // ລຶບ ### ຫຼື #### ໜ້າຫົວຂໍ້
+      .replace(/^\s*[-*_]{3,}\s*$/gm, '')       // ລຶບເສັ້ນຂີດ --- ຫຼື ***
+      .replace(/\*\*(.*?)\*\*/g, '$1')          // ລຶບ **...** ອອກໃຫ້ເຫຼືອແຕ່ຂໍ້ຄວາມ
+      .replace(/__(.*?)__/g, '$1')              // ລຶບ __...__ ອອກ
+      .replace(/\*\*/g, '')                     // ລຶບ ** ທີ່ອາດເຫຼືອຄ້າງຕອນ Streaming
+      .replace(/\n{3,}/g, '\n\n')               // ຫຍໍ້ບັນທັດຫວ່າງທີ່ຫຼາຍເກີນໄປ
+      .trim();
   }
 
   // =========================================================
@@ -648,7 +666,8 @@
       '4. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ, ຕົວເລກ ຫຼື ເຫດການທີ່ບໍ່ປາກົດໃນຂໍ້ມູນ.',
       '5. ຮັກສາຊື່ສະເພາະ, ຕົວເລກ ແລະ ຂໍ້ມູນສຳຄັນໃຫ້ຖືກຕ້ອງ.',
       '6. ຈັດຮູບແບບມີຫົວຂໍ້, ເນື້ອໃນຫຼັກ, ບັນຫາ/ຂໍ້ຄົງຄ້າງ (ຖ້າມີ), ແລະ ທິດທາງຕໍ່ໄປ.',
-      '7. ຕອບເປັນພາສາລາວທາງການ.',
+      '7. ຕອບເປັນພາສາລາວທາງການທີ່ຖືກຕ້ອງຕາມຫຼັກໄວຍາກອນ 100%, ຫ້າມປົນຕົວອັກສອນພາສາອື່ນ (ເຊັ່ນ ພາສາຂະແມ ຫຼື ໄທ). ຄຳຂວັນຕ້ອງຂຽນໃຫ້ຖືກວ່າ: ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດຖະນາຖາວອນ.',
+      '8. ຕອບເປັນຂໍ້ຄວາມທຳມະດາ (Plain Text) ເທົ່ານັ້ນ, ຫ້າມໃຊ້ສັນຍາລັກ Markdown ເຊັ່ນ **, ###, --- ຫຼື __ ຢ່າງເດັດຂາດ.',
       '',
       'ຂໍ້ມູນຕົ້ນສະບັບ:',
       grouped
@@ -689,9 +708,10 @@
     return cachedGeminiModels;
   }
 
-  async function callAI(prompt, { onProgress = null, onChunk = null, timeoutMs = 15000, fastTest = false } = {}) {
+  async function callAI(prompt, { onProgress = null, onChunk = null, timeoutMs = 30000, fastTest = false } = {}) {
     const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
-    if (!cfg.key) throw new Error('ຍັງບໍ່ໄດ້ປ້ອນ API Key');
+    const keys = String(cfg.key || '').split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
+    if (!keys.length) throw new Error('ຍັງບໍ່ໄດ້ປ້ອນ API Key');
 
     const endpoint = cfg.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
     const primaryModel = (cfg.model || 'gemini-2.5-flash').trim();
@@ -700,15 +720,15 @@
       : (cfg.systemPrompt || 'ຊ່ວຍສັງເຄາະລາຍງານພາສາລາວ ໂດຍບໍ່ແຕ່ງຂໍ້ມູນ.');
     const isGemini = endpoint.includes('generativelanguage.googleapis.com');
 
-    async function sendRequest(targetModel) {
+    async function sendRequest(targetModel, apiKey) {
       const useStream = isGemini && typeof onChunk === 'function';
       const url = isGemini
-        ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:${useStream ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${encodeURIComponent(cfg.key)}`
+        ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:${useStream ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${encodeURIComponent(apiKey)}`
         : endpoint;
 
       const headers = isGemini
         ? { 'Content-Type': 'application/json' }
-        : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + cfg.key };
+        : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
 
       const genConfig = { temperature: 0.2 };
       if (fastTest) genConfig.maxOutputTokens = 30;
@@ -796,56 +816,70 @@
       }
     }
 
-    // ລອງເຊື່ອມຕໍ່ Model ຫຼັກກ່ອນ 1 ຄັ້ງ (ຖ້າຊ້າ ຫຼື ແອອັດ ໃຫ້ສະຫຼັບທັນທີບໍ່ຕ້ອງລໍຊ້ຳ)
     let lastErr = '';
-    let reason = '';
+    let isQuotaExceeded = false;
     let shouldFallback = false;
-    onProgress?.(`ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}...`);
-    try {
-      const { res, data, text } = await sendRequest(primaryModel);
-      if (res.ok) return text;
-      shouldFallback = [400, 404, 429, 500, 503].includes(res.status);
-      reason = `ລະຫັດ ${res.status}`;
-      lastErr = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
-    } catch (err) {
-      shouldFallback = true;
-      reason = 'ຕອບຊ້າ';
-      lastErr = err.message;
-    }
 
-    // ສະຫຼັບໄປ Model ທີ່ໄວ ແລະ ສະຖຽນທີ່ສຸດ (ຫຼີກລ້ຽງ preview/exp/pro) ແລ້ວບັນທຶກຈື່ໄວ້ອັດຕະໂນມັດ
-    if (isGemini && shouldFallback) {
+    for (let kIdx = 0; kIdx < keys.length; kIdx++) {
+      const apiKey = keys[kIdx];
+      const keyTag = keys.length > 1 ? ` [Key ${kIdx + 1}/${keys.length}]` : '';
+      let reason = '';
+
+      // 1. ລອງເຊື່ອມຕໍ່ Model ຫຼັກ
+      onProgress?.(`ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}${keyTag}...`);
       try {
-        onProgress?.(`${primaryModel} (${reason}), ກຳລັງສະຫຼັບໄປ Model ທີ່ໄວກວ່າ...`);
-        const available = await fetchGeminiModels(cfg.key);
-        const rankModel = m => {
-          let score = 0;
-          if (/flash-lite/i.test(m)) score += 5;
-          else if (/flash/i.test(m)) score += 3;
-          if (/2\.5/i.test(m)) score += 2;
-          if (/latest/i.test(m)) score -= 2;
-          if (/(preview|exp|pro|thinking)/i.test(m)) score -= 4;
-          return score;
-        };
-        const backups = available
-          .filter(m => m !== primaryModel)
-          .sort((a, b) => rankModel(b) - rankModel(a))
-          .slice(0, 3);
+        const { res, data, text } = await sendRequest(primaryModel, apiKey);
+        if (res.ok) return text;
+        const msg = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
+        if (res.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
+        shouldFallback = [400, 404, 429, 500, 503].includes(res.status);
+        reason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : `ລະຫັດ ${res.status}`;
+        lastErr = msg;
+      } catch (err) {
+        shouldFallback = true;
+        reason = 'ຕອບຊ້າ';
+        lastErr = err.message;
+      }
 
-        for (const alt of backups) {
-          onProgress?.(`ກຳລັງສະຫຼັບໄປໃຊ້ ${alt}...`);
-          try {
-            const { res, text } = await sendRequest(alt);
-            if (res.ok) {
-              $('model').value = alt;
-              localStorage.setItem(CFG_KEY, JSON.stringify({ ...cfg, model: alt }));
-              return text;
-            }
-          } catch (_) {}
-        }
-      } catch (_) {}
+      // 2. ຖ້າເປັນ Gemini ໃຫ້ລອງ Model ສຳຮອງທີ່ຍັງເຫຼືອໂຄຕ້າ (ສູງສຸດ 8 ຕົວ)
+      if (isGemini && shouldFallback) {
+        try {
+          onProgress?.(`${primaryModel}${keyTag} (${reason}), ກຳລັງຊອກ Model ສຳຮອງ...`);
+          const available = await fetchGeminiModels(apiKey);
+          const rankModel = m => {
+            let score = 0;
+            if (/flash-lite/i.test(m)) score += 5;
+            else if (/flash/i.test(m)) score += 3;
+            if (/2\.5/i.test(m)) score += 2;
+            if (/latest/i.test(m)) score -= 2;
+            if (/(preview|exp|pro|thinking)/i.test(m)) score -= 4;
+            return score;
+          };
+          const backups = available
+            .filter(m => m !== primaryModel)
+            .sort((a, b) => rankModel(b) - rankModel(a))
+            .slice(0, 8);
+
+          for (const alt of backups) {
+            onProgress?.(`ກຳລັງສະຫຼັບໄປໃຊ້ ${alt}${keyTag}...`);
+            try {
+              const { res, data, text } = await sendRequest(alt, apiKey);
+              if (res.ok) {
+                $('model').value = alt;
+                localStorage.setItem(CFG_KEY, JSON.stringify({ ...cfg, model: alt }));
+                return text;
+              }
+              const altMsg = data?.error?.message || '';
+              if (res.status === 429 || /quota/i.test(altMsg)) isQuotaExceeded = true;
+            } catch (_) {}
+          }
+        } catch (_) {}
+      }
     }
 
+    if (isQuotaExceeded) {
+      throw new Error('ໂຄຕ້າຟຣີຕໍ່ມື້ຂອງ API Key ນີ້ໝົດແລ້ວ (20 ຄັ້ງ/ມື້). ແນະນຳໃຫ້ກົດ "ໃຊ້ Groq" ຫຼື ເພີ່ມ API Key ຈາກບັນຊີ Gmail ອື່ນ (' + lastErr + ')');
+    }
     throw new Error(shouldFallback
       ? 'ເຊີບເວີ AI ແອອັດຊົ່ວຄາວ, ກະລຸນາກົດ "ດຶງລາຍຊື່ Model" ເພື່ອເລືອກຕົວອື່ນ (' + lastErr + ')'
       : lastErr);
@@ -887,13 +921,13 @@
         ? await callAI(buildPrompt(rs), {
             onProgress: msg => showProgress(msg),
             onChunk: txt => {
-              $('result').value = txt;
+              $('result').value = cleanOutput(txt);
               showProgress(`AI (${$('model').value}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
             },
-            timeoutMs: 12000
+            timeoutMs: 30000
           })
         : fallbackSummary(rs);
-      $('result').value = output;
+      $('result').value = cleanOutput(output);
       const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
       setStatus(
         'genStatus',
@@ -966,8 +1000,20 @@
     }
   };
 
+  $('presetGemini').onclick = () => {
+    $('endpoint').value = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    $('model').value = 'gemini-2.5-flash';
+    setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Google Gemini ແລ້ວ — ວາງ API Key ແລ້ວກົດບັນທຶກ', 'ok');
+  };
+
+  $('presetGroq').onclick = () => {
+    $('endpoint').value = 'https://api.groq.com/openai/v1/chat/completions';
+    $('model').value = 'llama-3.3-70b-versatile';
+    setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Groq ແລ້ວ — ເອົາ API Key ຟຣີທີ່ console.groq.com ມາວາງ ແລ້ວກົດບັນທຶກ', 'ok');
+  };
+
   $('loadModels').onclick = async () => {
-    const key = $('apiKey').value.trim();
+    const key = $('apiKey').value.split(/[\n,]+/)[0].trim();
     if (!key) return setStatus('aiStatus', 'ກະລຸນາວາງ API Key ກ່ອນ', 'err');
     $('loadModels').disabled = true;
     setStatus('aiStatus', 'ກຳລັງດຶງລາຍຊື່ Model ທີ່ໃຊ້ໄດ້ຈາກ Google...');
