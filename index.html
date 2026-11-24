@@ -186,6 +186,7 @@
     .status.ok { color: var(--green); }
     .status.err { color: var(--red); }
     .hidden { display: none !important; }
+
     .footer {
       text-align: center;
       color: #8794a5;
@@ -244,12 +245,27 @@
         <option value="12">ທັນວາ</option>
       </select>
 
-      <label>ຊື່ວຽກງານ / ພາກສ່ວນ (ຖ້າມີ)</label>
-      <input id="department" list="deptOptions" placeholder="ຕົວຢ່າງ: ພະແນກ...">
-      <datalist id="deptOptions"></datalist>
+      <label>ຂະແໜງການ / ສູນ / ຫ້ອງການ</label>
+      <select id="department">
+        <option value="">-- ເລືອກພາກສ່ວນ --</option>
+      </select>
 
-      <label>ອາທິດທີ</label>
-      <input id="weekNo" placeholder="ຕົວຢ່າງ: 1">
+      <label>ປະເພດຂໍ້ມູນລາຍງານ</label>
+      <select id="reportType">
+        <option value="weekly">ລາຍງານປະຈຳອາທິດ</option>
+        <option value="monthly">ລາຍງານປະຈຳເດືອນ</option>
+      </select>
+
+      <div id="weekNoGroup">
+        <label>ອາທິດທີ</label>
+        <select id="weekNo">
+          <option value="1">ອາທິດທີ 1</option>
+          <option value="2">ອາທິດທີ 2</option>
+          <option value="3">ອາທິດທີ 3</option>
+          <option value="4">ອາທິດທີ 4</option>
+          <option value="5">ອາທິດທີ 5</option>
+        </select>
+      </div>
 
       <label>ຫົວຂໍ້ລາຍງານ</label>
       <input id="weekTitle" placeholder="ຕົວຢ່າງ: ຜົນການປະຊຸມ...">
@@ -326,13 +342,6 @@
                 <option value="detailed">ລະອຽດ ແລະ ຄົບຖ້ວນ</option>
               </select>
             </div>
-          </div>
-
-          <div>
-            <label>ກັ່ນຕອງຕາມຊື່ວຽກງານ / ພາກສ່ວນ</label>
-            <select id="filterDept">
-              <option value="">-- ທັງໝົດ (ທຸກພາກສ່ວນ) --</option>
-            </select>
           </div>
 
           <div class="stats" id="stats"></div>
@@ -447,6 +456,25 @@
     'ກໍລະກົດ', 'ສິງຫາ', 'ກັນຍາ', 'ຕຸລາ', 'ພະຈິກ', 'ທັນວາ'
   ];
 
+  const DEPARTMENTS = [
+    'ຂະແໜງ ກວດກາ, ປະເມີນຜົນ ແລະ ປະກັນຄຸນນະພາບ',
+    'ຂະແໜງ ບໍລິຫານ ແລະ ການເງິນ',
+    'ຂະແໜງ ຈັດຕັ້ງ ແລະ ພະນັກງານ',
+    'ຂະແໜງ ການສຶກສາກ່ອນໄວຮຽນ',
+    'ຂະແໜງ ການສຶກສານອກໂຮງຮຽນ ແລະ ຝຶກອົບຮົມວິຊາຊີບຂັ້ນພື້ນຖານ',
+    'ຂະແໜງ ພັດທະນາຄູ',
+    'ຂະແໜງ ສະຖິຕິ, ແຜນການ ແລະ ຮ່ວມມືກັບຕ່າງປະເທດ',
+    'ຂະແໜງ ສາມັນສຶກສາ',
+    'ຂະແໜງ ວິທະຍາສາດ, ອາຊີວະສຶກສາ ແລະ ການສຶກສາຊັ້ນສູງ',
+    'ຂະແໜງ ກິລາ-ກາຍະກຳ ແລະ ສິລະປະສຶກສາ',
+    'ສູນໄອຊີທີ ແຂວງໄຊຍະບູລີ',
+    'ສູນພັດທະນາເດັກ',
+    'ສູນພັດທະນາຄູ',
+    'ສູນສຶກສານິເທດ ແຂວງໄຊຍະບູລີ',
+    'ສູນການສຶກສານອກໂຮງຮຽນ',
+    'ຫ້ອງການກຳມາທິການສຶກສາສົງແຂວງ'
+  ];
+
   let records = [];
   let editingId = null;
 
@@ -461,10 +489,18 @@
     $(id).className = 'status ' + type;
   }
 
+  function toggleWeekInput() {
+    const isMonthly = $('reportType').value === 'monthly';
+    $('weekNoGroup').classList.toggle('hidden', isMonthly);
+  }
+
   function clearForm() {
     editingId = null;
-    ['weekNo', 'weekTitle', 'weekText'].forEach(id => $(id).value = '');
-    $('saveWeek').textContent = 'ບັນທຶກອາທິດ';
+    $('reportType').value = 'weekly';
+    toggleWeekInput();
+    $('weekNo').value = '1';
+    ['weekTitle', 'weekText'].forEach(id => $(id).value = '');
+    $('saveWeek').textContent = 'ບັນທຶກລາຍງານ';
   }
 
   function downloadFile(name, data, type) {
@@ -479,13 +515,17 @@
   function cleanOutput(text) {
     return String(text || '')
       .replace(/ប្រຊາທິປະໄຕ/g, 'ປະຊາທິປະໄຕ')
-      .replace(/[\u1780-\u17FF]+/g, '')          // ລຶບຕົວອັກສອນຂະແມທີ່ອາດຫຼົງປົນມາ
-      .replace(/^\s*#{1,6}\s*/gm, '')           // ລຶບ ### ຫຼື #### ໜ້າຫົວຂໍ້
-      .replace(/^\s*[-*_]{3,}\s*$/gm, '')       // ລຶບເສັ້ນຂີດ --- ຫຼື ***
-      .replace(/\*\*(.*?)\*\*/g, '$1')          // ລຶບ **...** ອອກໃຫ້ເຫຼືອແຕ່ຂໍ້ຄວາມ
-      .replace(/__(.*?)__/g, '$1')              // ລຶບ __...__ ອອກ
-      .replace(/\*\*/g, '')                     // ລຶບ ** ທີ່ອາດເຫຼືອຄ້າງຕອນ Streaming
-      .replace(/\n{3,}/g, '\n\n')               // ຫຍໍ້ບັນທັດຫວ່າງທີ່ຫຼາຍເກີນໄປ
+      .replace(/[\u1780-\u17FF]+/g, '')                         // ລຶບຕົວອັກສອນຂະແມ
+      .replace(/[\u0E00-\u0E7F]+\s*\(([^)]+)\)/g, '$1')        // ຖ້າມີຄຳໄທຕາມດ້ວຍວົງເລັບຄຳລາວ ໃຫ້ເອົາຄຳລາວແທນ
+      .replace(/[\u0E00-\u0E7F]+/g, '')                         // ລຶບຕົວອັກສອນໄທທີ່ຫຼົງປົນມາ
+      .replace(/([\u0EB1\u0EB4-\u0EBC\u0EC8-\u0ECD])\1+/g, '$1') // ແກ້ໄຂສະຫຼະ ຫຼື ວັນນະຍຸດລາວທີ່ຊ້ອນກັນ (ເຊັ່ນ ໄດຸຸຸ້ -> ໄດ້)
+      .replace(/^\s*#{1,6}\s*/gm, '')                          // ລຶບ ### ຫຼື #### ໜ້າຫົວຂໍ້
+      .replace(/^\s*[-*_]{3,}\s*$/gm, '')                      // ລຶບເສັ້ນຂີດ --- ຫຼື ***
+      .replace(/\*\*(.*?)\*\*/g, '$1')                         // ລຶບ **...** ອອກໃຫ້ເຫຼືອແຕ່ຂໍ້ຄວາມ
+      .replace(/__(.*?)__/g, '$1')                             // ລຶບ __...__ ອອກ
+      .replace(/\*\*/g, '')                                    // ລຶບ ** ທີ່ອາດເຫຼືອຄ້າງ
+      .replace(/[ \t]{2,}/g, ' ')                              // ຫຍໍ້ຍະຫວ່າງທີ່ຊ້ຳກັນ
+      .replace(/\n{3,}/g, '\n\n')                              // ຫຍໍ້ບັນທັດຫວ່າງທີ່ຫຼາຍເກີນໄປ
       .trim();
   }
 
@@ -507,20 +547,26 @@
   async function saveWeekRecord() {
     const year = +$('year').value;
     const month = +$('month').value;
-    const week = $('weekNo').value.trim();
+    const department = $('department').value.trim();
+    const reportType = $('reportType').value;
+    const week = reportType === 'monthly' ? '' : $('weekNo').value.trim();
     const text = $('weekText').value.trim();
 
-    if (!year || !week || !text) {
-      return alert('ກະລຸນາປ້ອນປີ, ອາທິດ ແລະ ເນື້ອໃນລາຍງານ');
+    if (!department) {
+      return alert('ກະລຸນາເລືອກ ຂະແໜງການ / ສູນ / ຫ້ອງການ');
+    }
+    if (!year || (reportType === 'weekly' && !week) || !text) {
+      return alert('ກະລຸນາປ້ອນປີ, ອາທິດ ແລະ ເນື້ອໃນລາຍງານໃຫ້ຄົບຖ້ວນ');
     }
 
     const row = {
       id: editingId || ('w' + Date.now() + Math.random().toString(16).slice(2)),
       year,
       month,
+      reportType,
       week,
       title: $('weekTitle').value.trim(),
-      department: $('department').value.trim(),
+      department,
       text,
       updated: new Date().toISOString()
     };
@@ -554,10 +600,16 @@
     editingId = id;
     $('year').value = r.year;
     $('month').value = r.month;
-    $('weekNo').value = r.week;
+
+    const deptVal = (r.department || '').trim();
+    $('department').value = DEPARTMENTS.includes(deptVal) ? deptVal : '';
+
+    const rType = r.reportType || (r.week ? 'weekly' : 'monthly');
+    $('reportType').value = rType;
+    toggleWeekInput();
+    $('weekNo').value = r.week || '1';
     $('weekTitle').value = r.title || '';
     $('weekText').value = r.text || '';
-    $('department').value = r.department || '';
     $('saveWeek').textContent = 'ບັນທຶກການແກ້ໄຂ';
 
     renderWeekList();
@@ -581,40 +633,48 @@
   // =========================================================
   // 4. ການສະແດງຜົນລາຍການ ແລະ ສະຖິຕິ (UI Rendering)
   // =========================================================
-  function updateDeptOptions() {
-    const depts = [...new Set(records.map(r => (r.department || '').trim()).filter(Boolean))].sort();
-    const current = $('filterDept') ? $('filterDept').value : '';
-    if ($('filterDept')) {
-      $('filterDept').innerHTML =
-        '<option value="">-- ທັງໝົດ (ທຸກພາກສ່ວນ) --</option>' +
-        depts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
-      if (depts.includes(current)) $('filterDept').value = current;
-    }
-    if ($('deptOptions')) {
-      $('deptOptions').innerHTML = depts.map(d => `<option value="${esc(d)}">`).join('');
-    }
+  function getAllDepartments() {
+    return DEPARTMENTS;
+  }
+
+  function initDeptSelect() {
+    const allDepts = getAllDepartments();
+    const cur = $('department').value;
+    $('department').innerHTML =
+      '<option value="">-- ເລືອກຂະແໜງການ / ສູນ / ຫ້ອງການ --</option>' +
+      allDepts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+    if (cur) $('department').value = cur;
   }
 
   function renderWeekList() {
-    updateDeptOptions();
+    initDeptSelect();
     const y = +$('year').value;
     const m = +$('month').value;
     const list = records
       .filter(r => r.year === y && r.month === m)
-      .sort((a, b) => Number(a.week) - Number(b.week));
+      .sort((a, b) => {
+        const typeA = (a.reportType || (a.week ? 'weekly' : 'monthly')) === 'monthly' ? 0 : 1;
+        const typeB = (b.reportType || (b.week ? 'weekly' : 'monthly')) === 'monthly' ? 0 : 1;
+        return typeA - typeB || Number(a.week || 0) - Number(b.week || 0);
+      });
 
     if (!list.length) {
       $('weekList').innerHTML = '<div class="small">ຍັງບໍ່ມີລາຍງານໃນເດືອນນີ້</div>';
     } else {
-      $('weekList').innerHTML = list.map(r => `
-        <div class="weekitem">
-          <strong>ອາທິດ ${esc(r.week)}${r.department ? ' [' + esc(r.department) + ']' : ''} · ${esc(r.title || 'ບໍ່ມີຫົວຂໍ້')}</strong>
-          <span>${esc(r.text.slice(0, 90))}${r.text.length > 90 ? '…' : ''}</span>
-          <br>
-          <button class="secondary" onclick="editRecord('${r.id}')">ແກ້ໄຂ</button>
-          <button class="danger" onclick="deleteRecord('${r.id}')">ລຶບ</button>
-        </div>
-      `).join('');
+      $('weekList').innerHTML = list.map(r => {
+        const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
+        const periodTag = isMonthly ? 'ປະຈຳເດືອນ' : `ອາທິດ ${esc(r.week)}`;
+        return `
+          <div class="weekitem">
+            <strong>[${periodTag}] ${r.department ? esc(r.department) : 'ບໍ່ລະບຸພາກສ່ວນ'}</strong>
+            ${r.title ? `<div style="color:#2463a6; font-weight:600">${esc(r.title)}</div>` : ''}
+            <span>${esc(r.text.slice(0, 90))}${r.text.length > 90 ? '…' : ''}</span>
+            <br>
+            <button class="secondary" onclick="editRecord('${r.id}')">ແກ້ໄຂ</button>
+            <button class="danger" onclick="deleteRecord('${r.id}')">ລຶບ</button>
+          </div>
+        `;
+      }).join('');
     }
     updateStats();
   }
@@ -634,26 +694,22 @@
 
   function getSelectedRecords() {
     const { months } = getSelectedRange();
-    const dept = $('filterDept') ? $('filterDept').value : '';
     return records
-      .filter(r =>
-        months.some(m => m.year === r.year && m.month === r.month) &&
-        (!dept || (r.department || '').trim() === dept)
-      )
-      .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week) - Number(b.week));
+      .filter(r => months.some(m => m.year === r.year && m.month === r.month))
+      .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week || 0) - Number(b.week || 0));
   }
 
   function updateStats() {
     if (!$('stats')) return;
     const { n } = getSelectedRange();
     const rs = getSelectedRecords();
-    const activeMonths = new Set(rs.map(r => `${r.year}-${r.month}`)).size;
+    const submittedDepts = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean)).size;
     const totalChars = rs.reduce((sum, r) => sum + r.text.length, 0).toLocaleString();
 
     $('stats').innerHTML = `
-      <div class="stat"><b>${rs.length}</b> ບົດອາທິດ</div>
+      <div class="stat"><b>${submittedDepts}/${DEPARTMENTS.length}</b> ພາກສ່ວນທີ່ມີບົດ</div>
+      <div class="stat"><b>${rs.length}</b> ບົດລາຍງານ</div>
       <div class="stat"><b>${n}</b> ເດືອນ</div>
-      <div class="stat"><b>${activeMonths}</b> ເດືອນທີ່ມີຂໍ້ມູນ</div>
       <div class="stat"><b>${totalChars}</b> ຕົວອັກສອນ</div>
     `;
   }
@@ -676,44 +732,57 @@
       official: 'ໃຊ້ສຳນວນພາສາລາຊະການທາງການ ສຸພາບ ແລະ ໜັກແໜ້ນ.'
     };
 
-    const dept = $('filterDept') ? $('filterDept').value : '';
-    const deptNote = dept ? ` (ສະເພາະວຽກງານ/ພາກສ່ວນ: ${dept})` : '';
+    const allDepts = getAllDepartments();
+    const activeDepts = allDepts.filter(d => rs.some(r => (r.department || '').trim() === d));
+    const missingDepts = allDepts.filter(d => !activeDepts.includes(d));
 
-    const grouped = months.map(m => {
-      const items = rs.filter(r => r.year === m.year && r.month === m.month);
-      const body = items.length
-        ? items.map(r => `[ອາທິດ ${r.week}${r.department ? ' | ' + r.department : ''}${r.title ? ' | ' + r.title : ''}]\n${r.text}`).join('\n\n')
-        : '[ບໍ່ມີຂໍ້ມູນລາຍງານໃນເດືອນນີ້]';
-      return `\n### ${MONTHS[m.month - 1]} ${m.year}\n${body}`;
+    const groupedByDept = activeDepts.map((dept, idx) => {
+      const items = rs.filter(r => (r.department || '').trim() === dept);
+      const body = items.map(r => {
+        const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
+        const timeTag = isMonthly
+          ? `ລາຍງານປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}`
+          : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
+        return `[${timeTag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
+      }).join('\n\n');
+      return `\n=== ${idx + 1}. ${dept} ===\n${body}`;
     }).join('\n');
 
+    const ungrouped = rs.filter(r => !DEPARTMENTS.includes((r.department || '').trim()));
+    const ungroupedText = ungrouped.length
+      ? `\n=== ພາກສ່ວນອື່ນໆ ===\n` + ungrouped.map(r => `[${MONTHS[r.month - 1]} ${r.year}]\n${r.text}`).join('\n\n')
+      : '';
+
     return [
-      `ຈົ່ງສັງເຄາະບົດລາຍງານລາຍອາທິດຕໍ່ໄປນີ້ ໃຫ້ເປັນບົດສະຫຼຸບ${periodName(n)}${deptNote} ສຳລັບໄລຍະ ${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}. ${styleMap[style]}`,
+      `ຈົ່ງສັງເຄາະບົດລາຍງານຈາກບັນດາຂະແໜງການ, ສູນ ແລະ ຫ້ອງການ ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ" ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}). ${styleMap[style]}`,
+      `ພາກສ່ວນທີ່ສົ່ງຂໍ້ມູນເຂົ້າສັງລວມ (${activeDepts.length} ພາກສ່ວນ): ${activeDepts.join(', ') || 'ບໍ່ມີ'}.`,
+      missingDepts.length ? `ໝາຍເຫດ: ສະຫຼຸບສະເພາະຂໍ້ມູນຂອງພາກສ່ວນທີ່ສົ່ງມາຂ້າງລຸ່ມນີ້ເທົ່ານັ້ນ ຫ້າມແຕ່ງຂໍ້ມູນໃສ່ແທນພາກສ່ວນທີ່ຍັງບໍ່ສົ່ງ.` : '',
       '',
-      'ຫຼັກການ:',
-      '1. ອ່ານທຸກອາທິດ ແລະ ທຸກເດືອນກ່ອນສັງເຄາະ.',
-      '2. ລວມປະເດັນທີ່ຊ້ຳກັນ ແລະ ຈັດໝວດວຽກງານທີ່ກ່ຽວຂ້ອງ.',
-      '3. ບໍ່ລຽງລາຍງານອາທິດຕໍ່ກັນຊື່ໆ; ຕ້ອງຂຽນເປັນບົດລາຍງານໃໝ່ທີ່ອ່ານລື່ນໄຫຼ.',
-      '4. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ, ຕົວເລກ ຫຼື ເຫດການທີ່ບໍ່ປາກົດໃນຂໍ້ມູນ.',
-      '5. ຮັກສາຊື່ສະເພາະ, ຕົວເລກ ແລະ ຂໍ້ມູນສຳຄັນໃຫ້ຖືກຕ້ອງ.',
-      '6. ຈັດຮູບແບບມີຫົວຂໍ້, ເນື້ອໃນຫຼັກ, ບັນຫາ/ຂໍ້ຄົງຄ້າງ (ຖ້າມີ), ແລະ ທິດທາງຕໍ່ໄປ.',
-      '7. ຕອບເປັນພາສາລາວທາງການທີ່ຖືກຕ້ອງຕາມຫຼັກໄວຍາກອນ 100%, ຫ້າມປົນຕົວອັກສອນພາສາອື່ນ (ເຊັ່ນ ພາສາຂະແມ ຫຼື ໄທ). ຄຳຂວັນຕ້ອງຂຽນໃຫ້ຖືກວ່າ: ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດຖະນາຖາວອນ.',
-      '8. ຕອບເປັນຂໍ້ຄວາມທຳມະດາ (Plain Text) ເທົ່ານັ້ນ, ຫ້າມໃຊ້ສັນຍາລັກ Markdown ເຊັ່ນ **, ###, --- ຫຼື __ ຢ່າງເດັດຂາດ.',
+      'ຫຼັກການສັງເຄາະ:',
+      '1. ຫົວບົດ ແລະ ພາບລວມໃຫ້ຂຽນໃນນາມ "ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ" ແລ້ວຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື:',
+      '   - ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ (ໃຫ້ຈັດລຽງເປັນຂໍ້ຍ່ອຍແຍກຕາມຊື່ ຂະແໜງການ / ສູນ / ຫ້ອງການ ຢ່າງຊັດເຈນ ເຊັ່ນ: 1. ຂະແໜງ..., 2. ຂະແໜງ..., 3. ສູນ...; ພາຍໃນແຕ່ລະຂະແໜງ/ສູນ ໃຫ້ສັງເຄາະລວມເນື້ອໃນຈາກທຸກອາທິດ/ເດືອນເຂົ້າກັນ ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ).',
+      '   - ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ (ສັງລວມຈາກໝວດວຽກທີ່ຍັງຄ້າງ ໂດຍແຍກຕາມຂະແໜງການ/ສູນ ທີ່ກ່ຽວຂ້ອງ).',
+      '   - ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ (ສັງລວມຈາກໝວດທິດທາງແຜນການຂອງແຕ່ລະເດືອນ ໂດຍແຍກຕາມຂະແໜງການ/ສູນ ແລະ ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ).',
+      '2. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ ຫຼື ເຫດການທີ່ບໍ່ມີໃນຂໍ້ມູນຕົ້ນສະບັບ.',
+      '3. ຂຽນໃຫ້ຈົບຄົບຖ້ວນທັງ 3 ພາກ ດ້ວຍພາສາລາວທາງການ 100%, ຫ້າມປົນຕົວອັກສອນພາສາໄທ ຫຼື ພາສາຂະແມ ແລະ ຫ້າມຂຽນຄຳແປໃນວົງເລັບ.',
+      '4. ຕອບເປັນຂໍ້ຄວາມທຳມະດາ (Plain Text) ເທົ່ານັ້ນ, ຫ້າມໃຊ້ສັນຍາລັກ Markdown ເຊັ່ນ **, ###, --- ຫຼື __ ຢ່າງເດັດຂາດ.',
       '',
-      'ຂໍ້ມູນຕົ້ນສະບັບ:',
-      grouped
-    ].join('\n');
+      'ຂໍ້ມູນຕົ້ນສະບັບແຍກຕາມພາກສ່ວນ:',
+      groupedByDept + ungroupedText
+    ].filter(Boolean).join('\n');
   }
 
   function fallbackSummary(rs) {
     const { y, n, start, months } = getSelectedRange();
     const endMonth = MONTHS[months[months.length - 1].month - 1];
+    const allDepts = getAllDepartments();
 
-    const grouped = months.map(m => {
-      const items = rs.filter(r => r.year === m.year && r.month === m.month);
-      const body = items.length ? items.map(r => r.text.trim()).join(' ') : 'ບໍ່ມີຂໍ້ມູນລາຍງານ.';
-      return `${MONTHS[m.month - 1]} ${m.year}: ${body}`;
-    }).join('\n\n');
+    const grouped = allDepts.map(dept => {
+      const items = rs.filter(r => (r.department || '').trim() === dept);
+      if (!items.length) return '';
+      const body = items.map(r => r.text.trim()).join(' ');
+      return `• ${dept}:\n${body}`;
+    }).filter(Boolean).join('\n\n');
 
     return `ບົດສະຫຼຸບຜົນການປະຕິບັດວຽກ${periodName(n)}\nໄລຍະ: ${MONTHS[start - 1]} ຫາ ${endMonth} ${y}\n\n${grouped}\n\nໝາຍເຫດ: ນີ້ແມ່ນການລວມຂໍ້ຄວາມພື້ນຖານ (ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ AI).`;
   }
@@ -751,8 +820,8 @@
       : (cfg.systemPrompt || 'ຊ່ວຍສັງເຄາະລາຍງານພາສາລາວ ໂດຍບໍ່ແຕ່ງຂໍ້ມູນ.');
     const isGemini = endpoint.includes('generativelanguage.googleapis.com');
 
-    async function sendRequest(targetModel, apiKey) {
-      const useStream = isGemini && typeof onChunk === 'function';
+    async function sendRequest(targetModel, apiKey, allowStream = true) {
+      const useStream = isGemini && allowStream && typeof onChunk === 'function';
       const url = isGemini
         ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:${useStream ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${encodeURIComponent(apiKey)}`
         : endpoint;
@@ -763,7 +832,7 @@
 
       const genConfig = {
         temperature: 0.2,
-        maxOutputTokens: fastTest ? 30 : 8192
+        maxOutputTokens: fastTest ? 30 : 16384
       };
       if (/2\.5-flash/i.test(targetModel)) {
         genConfig.thinkingConfig = { thinkingBudget: 0 };
@@ -773,6 +842,12 @@
         ? {
             system_instruction: { parts: [{ text: sysPrompt }] },
             contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            safetySettings: [
+              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+            ],
             generationConfig: genConfig
           }
         : {
@@ -873,13 +948,14 @@
       const keyTag = keys.length > 1 ? ` [Key ${kIdx + 1}/${keys.length}]` : '';
       let reason = '';
 
-      // 1. ລອງເຊື່ອມຕໍ່ Model ຫຼັກ (ລອງຊ້ຳອັດຕະໂນມັດ 1 ຄັ້ງ ຖ້າ Stream ຂາດກາງຄັນ)
+      // 1. ລອງເຊື່ອມຕໍ່ Model ຫຼັກ (ຮອບ 1 ແບບ Streaming, ຖ້າຂາດຊ່ວງ ຮອບ 2 ດຶງແບບເຕັມສະບັບທັນທີ)
       for (let attempt = 1; attempt <= 2; attempt++) {
-        onProgress?.(attempt === 1
+        const allowStream = attempt === 1;
+        onProgress?.(allowStream
           ? `ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}${keyTag}...`
-          : `ຂໍ້ຄວາມຂາດຊ່ວງ, ກຳລັງລອງໃໝ່ ${primaryModel}${keyTag}...`);
+          : `ຂໍ້ຄວາມຂາດຊ່ວງ, ກຳລັງດຶງຂໍ້ມູນແບບເຕັມສະບັບຈາກ ${primaryModel}${keyTag}...`);
         try {
-          const { res, data, text } = await sendRequest(primaryModel, apiKey);
+          const { res, data, text } = await sendRequest(primaryModel, apiKey, allowStream);
           if (res.ok) return text;
           const msg = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
           if (res.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
@@ -891,11 +967,11 @@
           shouldFallback = true;
           reason = 'ຕອບຊ້າ';
           lastErr = err.message;
-          break;
+          if (attempt === 2) break;
         }
       }
 
-      // 2. ຖ້າເປັນ Gemini ໃຫ້ລອງ Model ສຳຮອງທີ່ຍັງເຫຼືອໂຄຕ້າ (ສູງສຸດ 8 ຕົວ)
+      // 2. ຖ້າເປັນ Gemini ແລະ Model ຫຼັກໃຊ້ບໍ່ໄດ້ ໃຫ້ລອງ Model ສຳຮອງສາຍ Flash (ສູງສຸດ 4 ຕົວ ແບບເຕັມສະບັບ)
       if (isGemini && shouldFallback) {
         try {
           onProgress?.(`${primaryModel}${keyTag} (${reason}), ກຳລັງຊອກ Model ສຳຮອງ...`);
@@ -903,29 +979,27 @@
           const rankModel = m => {
             let score = 0;
             if (/2\.5-flash$/i.test(m)) score += 8;
-            else if (/flash-lite/i.test(m)) score += 3;
+            else if (/flash-lite/i.test(m)) score += 6;
             else if (/flash/i.test(m)) score += 5;
             if (/2\.5/i.test(m)) score += 2;
             if (/latest/i.test(m)) score -= 2;
-            if (/(preview|exp|pro|thinking)/i.test(m)) score -= 4;
+            if (/(preview|exp|pro|thinking)/i.test(m)) score -= 6;
             return score;
           };
           const backups = available
-            .filter(m => m !== primaryModel)
+            .filter(m => m !== primaryModel && /flash/i.test(m))
             .sort((a, b) => rankModel(b) - rankModel(a))
-            .slice(0, 8);
+            .slice(0, 4);
 
           for (const alt of backups) {
             onProgress?.(`ກຳລັງສະຫຼັບໄປໃຊ້ ${alt}${keyTag}...`);
             try {
-              const { res, data, text } = await sendRequest(alt, apiKey);
+              const { res, text } = await sendRequest(alt, apiKey, false);
               if (res.ok) {
                 $('model').value = alt;
                 localStorage.setItem(CFG_KEY, JSON.stringify({ ...cfg, model: alt }));
                 return text;
               }
-              const altMsg = data?.error?.message || '';
-              if (res.status === 429 || /quota/i.test(altMsg)) isQuotaExceeded = true;
             } catch (_) {}
           }
         } catch (_) {}
@@ -948,10 +1022,10 @@
   $('clearForm').onclick = clearForm;
   $('year').onchange = renderWeekList;
   $('month').onchange = renderWeekList;
+  $('reportType').onchange = toggleWeekInput;
   $('sumYear').onchange = updateStats;
   $('period').onchange = updateStats;
   $('startMonth').onchange = updateStats;
-  $('filterDept').onchange = updateStats;
 
   $('generate').onclick = async () => {
     const rs = getSelectedRecords();
@@ -980,7 +1054,7 @@
               $('result').value = cleanOutput(txt);
               showProgress(`AI (${$('model').value}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
             },
-            timeoutMs: 60000
+            timeoutMs: 90000
           })
         : fallbackSummary(rs);
       $('result').value = cleanOutput(output);
@@ -1200,6 +1274,8 @@
   $('month').value = now.getMonth() + 1;
   $('startMonth').value = 1;
 
+  initDeptSelect();
+  toggleWeekInput();
   loadAISettings();
   loadRecords();
 </script>
