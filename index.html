@@ -899,16 +899,36 @@
     const { y, n, start, months } = getSelectedRange();
     const endMonth = MONTHS[months[months.length - 1].month - 1];
     const allDepts = getAllDepartments();
+    let idx = 0;
 
     const grouped = allDepts.map(dept => {
       const items = rs.filter(r => (r.department || '').trim() === dept);
       if (!items.length) return '';
-      const body = items.map(r => r.text.trim()).join(' ');
-      return `• ${dept}:\n${body}`;
+      idx++;
+      const body = items.map(r => r.text.trim()).join('\n');
+      return `${idx}. ${dept}\n${body}`;
     }).filter(Boolean).join('\n\n');
 
-    return `ບົດສະຫຼຸບຜົນການປະຕິບັດວຽກ${periodName(n)}\nໄລຍະ: ${MONTHS[start - 1]} ຫາ ${endMonth} ${y}\n\n${grouped}\n\nໝາຍເຫດ: ນີ້ແມ່ນການລວມຂໍ້ຄວາມພື້ນຖານ (ຍັງບໍ່ໄດ້ຕັ້ງຄ່າ AI).`;
+    return [
+      `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`,
+      '',
+      'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ',
+      grouped,
+      '',
+      'ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ',
+      '- (ກະລຸນາກວດທານ ແລະ ຄັດຈ້ອນຈາກເນື້ອໃນຂ້າງເທິງ)',
+      '',
+      'ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ',
+      '- (ກະລຸນາກວດທານ ແລະ ຄັດຈ້ອນຈາກເນື້ອໃນຂ້າງເທິງ)'
+    ].join('\n');
   }
+
+  window.useStructuredFallback = function () {
+    const rs = getSelectedRecords();
+    if (!rs.length) return;
+    $('result').value = cleanOutput(fallbackSummary(rs));
+    setStatus('genStatus', 'ຈັດລຽງບົດສະຫຼຸບແຍກຕາມຂະແໜງການສຳເລັດ (ສາມາດແກ້ໄຂ ຫຼື ດາວໂຫຼດ Word ໄດ້ເລີຍ).', 'ok');
+  };
 
   let cachedGeminiKey = '';
   let cachedGeminiModels = null;
@@ -925,7 +945,7 @@
       .filter(m =>
         m.supportedGenerationMethods?.includes('generateContent') &&
         /(gemini|gemma)/i.test(m.name) &&
-        !/(embedding|image|tts|audio|vision|robotics|computer-use|live|nano|customtools|deep-research)/i.test(m.name)
+        !/(embedding|image|tts|audio|vision|robotics|computer-use|live|nano|customtools|deep-research|omni|transcribe|translate|decision|genie|cyber)/i.test(m.name)
       )
       .map(m => m.name.replace(/^models\//, ''));
     return cachedGeminiModels;
@@ -951,7 +971,8 @@
       const isGemma = /gemma/i.test(targetModel);
       const genConfig = {
         temperature: 0.2,
-        maxOutputTokens: fastTest ? 40 : 8192
+        maxOutputTokens: fastTest ? 40 : 8192,
+        ...(!simpleMode && !isGemma ? { thinkingConfig: { thinkingBudget: 0 } } : {})
       };
 
       const payload = (isGemma || simpleMode)
@@ -972,7 +993,7 @@
           };
 
       const controller = new AbortController();
-      const waitMs = fastTest ? 15000 : Math.max(timeoutMs, 60000);
+      const waitMs = fastTest ? 12000 : 25000;
       const timer = setTimeout(() => controller.abort(), waitMs);
 
       try {
@@ -1093,13 +1114,13 @@
       const apiKey = keys[kIdx];
       const keyTag = keys.length > 1 ? ` [Key ${kIdx + 1}/${keys.length}]` : '';
 
-      const tryModel = async (targetModel) => {
-        for (let attempt = 1; attempt <= 2; attempt++) {
+      const tryModel = async (targetModel, maxTries = 1) => {
+        for (let attempt = 1; attempt <= maxTries; attempt++) {
           onProgress?.(attempt > 1
             ? `${targetModel}${keyTag} ແອອັດຊົ່ວຄາວ, ກຳລັງລອງຊ້ຳ...`
             : `ກຳລັງປະມວນຜົນດ້ວຍ ${targetModel}${keyTag}...`);
           onModelUsed?.(targetModel);
-          if (attempt > 1) await sleep(2000);
+          if (attempt > 1) await sleep(1500);
 
           try {
             const r = await runComplete(
@@ -1113,7 +1134,7 @@
             lastErr = msg;
 
             const reason = r.status === 429 ? 'ໂຄຕ້າເຕັມ' : (r.status === 503 ? 'ແອອັດ 503' : `ລະຫັດ ${r.status}`);
-            if ([500, 502, 503].includes(r.status) && attempt === 1) continue;
+            if ([500, 502, 503].includes(r.status) && attempt < maxTries) continue;
             attemptLogs.push(`${targetModel}: ${reason}`);
             return { success: false, status: r.status };
           } catch (err) {
@@ -1126,36 +1147,39 @@
       };
 
       // ລອງ Model ຫຼັກກ່ອນ
-      const primaryRes = await tryModel(primaryModel);
+      const primaryRes = await tryModel(primaryModel, 1);
       if (primaryRes.success) return primaryRes.text;
 
-      // ຖ້າເປັນ Google Gemini ໃຫ້ສະຫຼັບໄປ Model ສຳຮອງ (ລວມທັງ Gemma 3 ທີ່ໂຄຕ້າສູງ)
+      // ຖ້າເປັນ Google Gemini ໃຫ້ສະຫຼັບໄປ Model ທີ່ຕອບໄວ ແລະ ໂຄຕ້າສູງ (ດຶງ Gemma ຂຶ້ນກ່ອນ ເພາະໂຄຕ້າແຍກຕ່າງຫາກ)
       if (isGemini) {
         try {
-          onProgress?.(`ກຳລັງຄົ້ນຫາ Model ສຳຮອງຂອງ Google${keyTag}...`);
+          onProgress?.(`ກຳລັງຄົ້ນຫາ Model ທີ່ໄວ ແລະ ວ່າງຢູ່${keyTag}...`);
           const available = await fetchGeminiModels(apiKey);
           const rankModel = m => {
+            if (/(pro|31b|27b|26b|omni|carbon|argon|neon|latest|gemini-2\.0|gemini-2\.5)/i.test(m)) return -200;
             let score = 0;
-            if (/^gemini-3\.5-flash-lite$/i.test(m)) score += 115;
-            else if (/^gemini-3\.1-flash-lite$/i.test(m)) score += 110;
-            else if (/^gemini-3\.5-flash$/i.test(m)) score += 105;
-            else if (/gemma-3-27b-it$/i.test(m)) score += 95;
-            else if (/gemma-3-12b-it$/i.test(m)) score += 90;
-            else if (/gemma-3-4b-it$/i.test(m)) score += 80;
-            else if (/flash/i.test(m)) score += 60;
-            if (/preview/i.test(m)) score -= 35;
-            if (/(pro|31b|latest|gemini-2\.0|gemini-2\.5)/i.test(m)) score -= 100;
+            if (/^gemma-4.*(12b|e4b)/i.test(m)) score += 135;
+            else if (/^gemma-4.*(4b|e2b)/i.test(m)) score += 130;
+            else if (/^gemma-3.*(12b|e4b)/i.test(m)) score += 125;
+            else if (/^gemma-/i.test(m)) score += 120;
+            else if (/^gemini-3\.5-flash-lite$/i.test(m)) score += 115;
+            else if (/^gemini-4-hydrogen$/i.test(m)) score += 110;
+            else if (/^gemini-3\.1-flash-lite$/i.test(m)) score += 105;
+            else if (/^gemini-3\.8-flash$/i.test(m)) score += 95;
+            else if (/^gemini-3\.6-flash$/i.test(m)) score += 90;
+            else if (/flash/i.test(m)) score += 50;
+            if (/preview/i.test(m)) score -= 25;
             return score;
           };
 
           const backups = available
             .filter(m => m !== primaryModel && rankModel(m) > 0)
             .sort((a, b) => rankModel(b) - rankModel(a))
-            .slice(0, 4);
+            .slice(0, 8);
 
           for (const alt of backups) {
-            await sleep(500);
-            const altRes = await tryModel(alt);
+            await sleep(250);
+            const altRes = await tryModel(alt, 1);
             if (altRes.success) return altRes.text;
           }
         } catch (_) {}
@@ -1165,7 +1189,7 @@
     // 2. ຖ້າ Google AI ລົ້ມເຫຼວທັງໝົດ ແຕ່ມີ Groq Backup Key -> ສະຫຼັບໄປ Groq ອັດຕະໂນມັດທັນທີ!
     if (groqBackupKey) {
       const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
-      const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+      const groqModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'llama-3.3-70b-versatile'];
       for (const gm of groqModels) {
         onProgress?.(`Google AI ບໍ່ວ່າງ — ກຳລັງສະຫຼັບໄປ Groq (${gm}) ອັດຕະໂນມັດ...`);
         onModelUsed?.(`Groq: ${gm}`);
@@ -1179,7 +1203,7 @@
       }
     }
 
-    const summaryLog = [...new Set(attemptLogs)].slice(0, 5).join(', ');
+    const summaryLog = [...new Set(attemptLogs)].join(', ');
     if (isQuotaExceeded && !attemptLogs.some(l => l.includes('503'))) {
       throw new Error(`ໂຄຕ້າຟຣີຕໍ່ມື້ໝົດແລ້ວ (${summaryLog}) — ແນະນຳໃຫ້ໃສ່ Groq API Key ສຳຮອງໃນແຖບຕັ້ງຄ່າ AI`);
     }
@@ -1244,7 +1268,8 @@
         'ok'
       );
     } catch (e) {
-      setStatus('genStatus', 'ເກີດຂໍ້ຜິດພາດ: ' + e.message, 'err');
+      $('genStatus').className = 'status err';
+      $('genStatus').innerHTML = `ເກີດຂໍ້ຜິດພາດ: ${esc(e.message)} <br><button type="button" class="secondary" style="margin-top:6px" onclick="useStructuredFallback()">ຈັດລຽງບົດລາຍງານແຍກຂະແໜງການທັນທີ (ບໍ່ໃຊ້ AI)</button>`;
     } finally {
       clearInterval(tick);
       $('generate').disabled = false;
@@ -1361,7 +1386,7 @@
     $('endpoint').value = c.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
     $('apiKey').value = c.key || '';
     $('groqBackupKey').value = c.groqBackupKey || '';
-    $('model').value = c.model || 'gemini-3.5-flash-lite';
+    $('model').value = c.model || 'gemini-3.8-flash';
     if (c.systemPrompt) $('systemPrompt').value = c.systemPrompt;
   }
 
@@ -1395,13 +1420,13 @@
 
   $('presetGemini').onclick = () => {
     $('endpoint').value = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
-    $('model').value = 'gemini-2.5-flash';
-    setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Google Gemini ແລ້ວ — ວາງ API Key ແລ້ວກົດບັນທຶກ', 'ok');
+    $('model').value = 'gemini-3.8-flash';
+    setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Google Gemini 3.8 Flash ແລ້ວ — ວາງ API Key ແລ້ວກົດບັນທຶກ', 'ok');
   };
 
   $('presetGroq').onclick = () => {
     $('endpoint').value = 'https://api.groq.com/openai/v1/chat/completions';
-    $('model').value = 'llama-3.3-70b-versatile';
+    $('model').value = 'openai/gpt-oss-120b';
     setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Groq ແລ້ວ — ເອົາ API Key ຟຣີທີ່ console.groq.com ມາວາງ ແລ້ວກົດບັນທຶກ', 'ok');
   };
 
