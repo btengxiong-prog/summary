@@ -801,8 +801,8 @@
     cachedGeminiModels = (data.models || [])
       .filter(m =>
         m.supportedGenerationMethods?.includes('generateContent') &&
-        /gemini/i.test(m.name) &&
-        !/(embedding|image|tts|audio|vision|robotics|computer-use|live)/i.test(m.name)
+        /(gemini|gemma-3)/i.test(m.name) &&
+        !/(embedding|image|tts|audio|vision|robotics|computer-use|live|nano)/i.test(m.name)
       )
       .map(m => m.name.replace(/^models\//, ''));
     return cachedGeminiModels;
@@ -830,26 +830,32 @@
         ? { 'Content-Type': 'application/json' }
         : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
 
+      const isGemma = /gemma/i.test(targetModel);
       const genConfig = {
         temperature: 0.2,
-        maxOutputTokens: fastTest ? 30 : 16384
+        maxOutputTokens: fastTest ? 30 : (isGemma ? 8192 : 16384)
       };
       if (/2\.5-flash/i.test(targetModel)) {
         genConfig.thinkingConfig = { thinkingBudget: 0 };
       }
 
       const payload = isGemini
-        ? {
-            system_instruction: { parts: [{ text: sysPrompt }] },
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            safetySettings: [
-              { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-              { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
-            ],
-            generationConfig: genConfig
-          }
+        ? (isGemma
+            ? {
+                contents: [{ role: 'user', parts: [{ text: `${sysPrompt}\n\n${prompt}` }] }],
+                generationConfig: genConfig
+              }
+            : {
+                system_instruction: { parts: [{ text: sysPrompt }] },
+                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                safetySettings: [
+                  { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
+                  { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
+                  { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
+                  { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }
+                ],
+                generationConfig: genConfig
+              })
         : {
             model: targetModel,
             temperature: 0.2,
@@ -948,58 +954,61 @@
       const keyTag = keys.length > 1 ? ` [Key ${kIdx + 1}/${keys.length}]` : '';
       let reason = '';
 
-      // 1. ລອງເຊື່ອມຕໍ່ Model ຫຼັກ (ຮອບ 1 ແບບ Streaming, ຖ້າຂາດຊ່ວງ ຮອບ 2 ດຶງແບບເຕັມສະບັບທັນທີ)
-      for (let attempt = 1; attempt <= 2; attempt++) {
+      const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+      // 1. ລອງເຊື່ອມຕໍ່ Model ຫຼັກ (ສູງສຸດ 3 ຮອບ, ຖ້າ 503 ແອອັດ ໃຫ້ລໍຖ້າແລ້ວດຶງແບບເຕັມສະບັບ)
+      for (let attempt = 1; attempt <= 3; attempt++) {
         const allowStream = attempt === 1;
-        onProgress?.(allowStream
-          ? `ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}${keyTag}...`
-          : `ຂໍ້ຄວາມຂາດຊ່ວງ, ກຳລັງດຶງຂໍ້ມູນແບບເຕັມສະບັບຈາກ ${primaryModel}${keyTag}...`);
+        if (attempt > 1) {
+          onProgress?.(`ເຊີບເວີ ${primaryModel}${keyTag} ແອອັດຊົ່ວຄາວ, ກຳລັງລອງໃໝ່ຮອບທີ ${attempt}...`);
+          await sleep(attempt === 2 ? 1500 : 2500);
+        } else {
+          onProgress?.(`ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}${keyTag}...`);
+        }
         try {
           const { res, data, text } = await sendRequest(primaryModel, apiKey, allowStream);
           if (res.ok) return text;
           const msg = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
           if (res.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
           shouldFallback = [400, 404, 429, 500, 502, 503].includes(res.status);
-          reason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : (res.status === 502 ? 'ຂໍ້ຄວາມຂາດຊ່ວງ' : `ລະຫັດ ${res.status}`);
+          reason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : (res.status === 503 ? 'ເຊີບເວີແອອັດ' : (res.status === 502 ? 'ຂໍ້ຄວາມຂາດຊ່ວງ' : `ລະຫັດ ${res.status}`));
           lastErr = msg;
-          if (res.status !== 502) break;
+          if (![502, 503].includes(res.status)) break;
         } catch (err) {
           shouldFallback = true;
           reason = 'ຕອບຊ້າ';
           lastErr = err.message;
-          if (attempt === 2) break;
+          if (attempt === 3) break;
         }
       }
 
-      // 2. ຖ້າເປັນ Gemini ແລະ Model ຫຼັກໃຊ້ບໍ່ໄດ້ ໃຫ້ລອງ Model ສຳຮອງສາຍ Flash (ສູງສຸດ 4 ຕົວ ແບບເຕັມສະບັບ)
+      // 2. ຖ້າ Model ຫຼັກຍັງແອອັດ ໃຫ້ສະຫຼັບໄປໃຊ້ Model ສຳຮອງທີ່ໝັ້ນຄົງ (ສູງສຸດ 6 ຕົວ) ໂດຍບໍ່ບັນທຶກທັບຄ່າຫຼັກ
       if (isGemini && shouldFallback) {
         try {
           onProgress?.(`${primaryModel}${keyTag} (${reason}), ກຳລັງຊອກ Model ສຳຮອງ...`);
           const available = await fetchGeminiModels(apiKey);
           const rankModel = m => {
             let score = 0;
-            if (/2\.5-flash$/i.test(m)) score += 8;
-            else if (/flash-lite/i.test(m)) score += 6;
+            if (/^gemini-2\.5-flash$/i.test(m)) score += 10;
+            else if (/^gemini-2\.5-flash-lite$/i.test(m)) score += 9;
+            else if (/^gemini-2\.0-flash$/i.test(m)) score += 8;
+            else if (/gemma-3-27b-it$/i.test(m)) score += 7;
             else if (/flash/i.test(m)) score += 5;
-            if (/2\.5/i.test(m)) score += 2;
             if (/latest/i.test(m)) score -= 2;
-            if (/(preview|exp|pro|thinking)/i.test(m)) score -= 6;
+            if (/(preview|exp|pro|thinking)/i.test(m)) score -= 8;
             return score;
           };
           const backups = available
-            .filter(m => m !== primaryModel && /flash/i.test(m))
+            .filter(m => m !== primaryModel)
             .sort((a, b) => rankModel(b) - rankModel(a))
-            .slice(0, 4);
+            .slice(0, 6);
 
           for (const alt of backups) {
             onProgress?.(`ກຳລັງສະຫຼັບໄປໃຊ້ ${alt}${keyTag}...`);
+            await sleep(600);
             try {
               const { res, text } = await sendRequest(alt, apiKey, false);
-              if (res.ok) {
-                $('model').value = alt;
-                localStorage.setItem(CFG_KEY, JSON.stringify({ ...cfg, model: alt }));
-                return text;
-              }
+              if (res.ok) return text;
             } catch (_) {}
           }
         } catch (_) {}
