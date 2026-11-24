@@ -399,7 +399,7 @@
           <div class="actions no-print">
             <button id="generate" class="green">ສັງລວມບົດລາຍງານ (ອັດຕະໂນມັດ)</button>
             <button id="smartInstant" style="background:#1d5b96">ສັງລວມທັນທີ (ບໍ່ງໍ້ເຊີບເວີ AI)</button>
-            <button id="copyForWebAI" class="secondary">ຄັດລອກໄປວາງໃນ Gemini Web</button>
+            <button id="copyForWebAI" class="secondary">ຄັດລອກໄປວາງໃນ AI</button>
             <button id="clearResult" class="secondary">ລ້າງຜົນສະຫຼຸບ</button>
           </div>
           <div id="genStatus" class="status"></div>
@@ -410,13 +410,25 @@
             <h2>ຜົນການສັງລວມ</h2>
             <span class="small">ສາມາດແກ້ໄຂຂໍ້ຄວາມໄດ້</span>
           </div>
+          <input id="summaryTitle" class="no-print" placeholder="ຊື່ບົດສະຫຼຸບ (ເຊັ່ນ: ບົດສະຫຼຸບ 3 ເດືອນ ຕຸລາ - ທັນວາ 2026)..." style="margin-bottom:10px">
           <textarea id="result" placeholder="ຜົນການສັງລວມຈະສະແດງຢູ່ບ່ອນນີ້..."></textarea>
           <div class="actions no-print">
+            <button id="saveSummary" class="green">ບັນທຶກບົດສະຫຼຸບໄວ້ໃນລະບົບ</button>
             <button id="copy">ຄັດລອກຂໍ້ຄວາມ</button>
             <button class="secondary" id="downloadTxt">ດາວໂຫຼດ TXT</button>
             <button class="secondary" id="downloadDoc">ດາວໂຫຼດ Word (.doc)</button>
             <button class="secondary" id="print">ພິມ / Save PDF</button>
           </div>
+          <div id="saveSumStatus" class="status no-print"></div>
+        </div>
+
+        <div class="card no-print">
+          <div class="actions" style="justify-content:space-between; align-items:center; margin-top:0; margin-bottom:10px">
+            <h2 style="margin:0">ຄັງບົດສະຫຼຸບທີ່ບັນທຶກໄວ້ (Firebase)</h2>
+            <button type="button" class="secondary" id="refreshSummaries" style="padding:5px 10px; font-size:12px">ໂຫຼດໃໝ່</button>
+          </div>
+          <input id="searchSavedSummary" type="search" placeholder="ຄົ້ນຫາຊື່ບົດສະຫຼຸບ ຫຼື ໄລຍະເວລາ..." style="margin-bottom:10px">
+          <div id="savedSummaryList" style="display:flex; flex-direction:column; gap:8px; max-height:360px; overflow:auto"></div>
         </div>
       </section>
 
@@ -532,6 +544,8 @@
 
   let records = [];
   let editingId = null;
+  let savedSummaries = [];
+  let editingSummaryId = null;
 
   function esc(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({
@@ -591,13 +605,138 @@
     setStatus('dbStatus', 'ກຳລັງໂຫຼດຂໍ້ມູນຈາກ Firebase...');
     try {
       const snap = await reportsCol.get();
-      records = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const allDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      records = allDocs.filter(d => d.recordKind !== 'saved_summary');
+      savedSummaries = allDocs
+        .filter(d => d.recordKind === 'saved_summary')
+        .sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')));
       renderWeekList();
+      renderSavedSummaries();
       setStatus('dbStatus', `ເຊື່ອມຕໍ່ Firebase ແລ້ວ (${records.length} ລາຍການ)`, 'ok');
     } catch (error) {
       setStatus('dbStatus', 'ໂຫຼດຂໍ້ມູນບໍ່ສຳເລັດ: ' + error.message, 'err');
     }
   }
+
+  async function loadSummaries() {
+    await loadRecords();
+  }
+
+  function renderSavedSummaries() {
+    const box = $('savedSummaryList');
+    if (!box) return;
+    const kw = ($('searchSavedSummary')?.value || '').trim().toLowerCase();
+    const list = savedSummaries.filter(s => {
+      if (!kw) return true;
+      return `${s.title || ''} ${s.periodLabel || ''} ${s.text || ''}`.toLowerCase().includes(kw);
+    });
+
+    if (!list.length) {
+      box.innerHTML = `<div class="small">${savedSummaries.length ? 'ບໍ່ພົບບົດສະຫຼຸບທີ່ຄົ້ນຫາ' : 'ຍັງບໍ່ມີບົດສະຫຼຸບທີ່ບັນທຶກໄວ້ໃນລະບົບ'}</div>`;
+      return;
+    }
+
+    box.innerHTML = list.map(s => {
+      const dateStr = s.updated ? new Date(s.updated).toLocaleString('lo-LA') : '';
+      const isEditing = s.id === editingSummaryId;
+      return `
+        <div class="weekitem" style="${isEditing ? 'border-color:#2463a6; background:#f5f9ff;' : ''}">
+          <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap">
+            <strong style="color:var(--navy); font-size:13px">${esc(s.title || 'ບົດສະຫຼຸບບໍ່ມີຊື່')}</strong>
+            <span class="small">${esc(s.periodLabel || '')}</span>
+          </div>
+          <div class="small" style="margin:2px 0 4px">ບັນທຶກລ່າສຸດ: ${esc(dateStr)}</div>
+          <div style="color:#445566">${esc((s.text || '').slice(0, 120))}${(s.text || '').length > 120 ? '…' : ''}</div>
+          <div style="margin-top:6px">
+            <button type="button" class="secondary" onclick="openSavedSummary('${s.id}')">ເປີດເບິ່ງ / ແກ້ໄຂ</button>
+            <button type="button" class="danger" onclick="deleteSavedSummary('${s.id}')">ລຶບ</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  async function saveCurrentSummary() {
+    const text = $('result').value.trim();
+    if (!text) {
+      return setStatus('saveSumStatus', 'ຍັງບໍ່ມີເນື້ອໃນຜົນການສັງລວມສຳລັບບັນທຶກ', 'err');
+    }
+
+    const { y, n, start, months } = getSelectedRange();
+    const end = months[months.length - 1];
+    const periodLabel = n === 1
+      ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ${y}`
+      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ${y})`;
+
+    const firstLine = text.split('\n').map(l => l.trim()).find(Boolean) || '';
+    const title = $('summaryTitle').value.trim() || firstLine.slice(0, 80) || `ບົດສະຫຼຸບ ${periodLabel}`;
+
+    let targetId = 'sum' + Date.now() + Math.random().toString(16).slice(2, 6);
+    if (editingSummaryId) {
+      const overwrite = confirm('ທ່ານກຳລັງເປີດແກ້ໄຂບົດສະຫຼຸບເກົ່າ.\n- ກົດ OK ເພື່ອ "ບັນທຶກທັບ" ສະບັບເດີມ\n- ກົດ Cancel ເພື່ອ "ບັນທຶກເປັນສະບັບໃໝ່"');
+      if (overwrite) targetId = editingSummaryId;
+    }
+
+    const item = {
+      id: targetId,
+      recordKind: 'saved_summary',
+      year: y,
+      period: n,
+      startMonth: start,
+      periodLabel,
+      title,
+      text,
+      updated: new Date().toISOString()
+    };
+
+    $('saveSummary').disabled = true;
+    setStatus('saveSumStatus', 'ກຳລັງບັນທຶກບົດສະຫຼຸບລົງ Firebase...');
+    try {
+      await reportsCol.doc(item.id).set(item);
+      editingSummaryId = item.id;
+      $('summaryTitle').value = title;
+      const exists = savedSummaries.some(x => x.id === item.id);
+      savedSummaries = exists
+        ? savedSummaries.map(x => (x.id === item.id ? item : x))
+        : [item, ...savedSummaries];
+      renderSavedSummaries();
+      setStatus('saveSumStatus', 'ບັນທຶກບົດສະຫຼຸບໄວ້ໃນລະບົບສຳເລັດແລ້ວ!', 'ok');
+    } catch (error) {
+      setStatus('saveSumStatus', 'ບັນທຶກບໍ່ສຳເລັດ: ' + error.message, 'err');
+    } finally {
+      $('saveSummary').disabled = false;
+    }
+  }
+
+  window.openSavedSummary = function (id) {
+    const s = savedSummaries.find(x => x.id === id);
+    if (!s) return;
+
+    editingSummaryId = s.id;
+    $('summaryTitle').value = s.title || '';
+    $('result').value = s.text || '';
+    if (s.year) $('sumYear').value = s.year;
+    if (s.period) $('period').value = String(s.period);
+    if (s.startMonth) $('startMonth').value = String(s.startMonth);
+    updateStats();
+    renderSavedSummaries();
+
+    setStatus('saveSumStatus', `ກຳລັງເປີດເບິ່ງ: "${s.title}" (ສາມາດແກ້ໄຂ ຫຼື ດາວໂຫຼດ Word ໄດ້ເລີຍ)`, 'ok');
+    $('result').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  };
+
+  window.deleteSavedSummary = async function (id) {
+    if (!confirm('ຢືນຢັນລຶບບົດສະຫຼຸບສະບັບນີ້ອອກຈາກລະບົບ?')) return;
+    try {
+      await reportsCol.doc(id).delete();
+      if (editingSummaryId === id) editingSummaryId = null;
+      savedSummaries = savedSummaries.filter(x => x.id !== id);
+      renderSavedSummaries();
+      setStatus('saveSumStatus', 'ລຶບບົດສະຫຼຸບສຳເລັດ', 'ok');
+    } catch (error) {
+      setStatus('saveSumStatus', 'ລຶບບໍ່ສຳເລັດ: ' + error.message, 'err');
+    }
+  };
 
   async function saveWeekRecord() {
     const year = +$('year').value;
@@ -1429,9 +1568,17 @@
   };
 
   $('clearResult').onclick = () => {
+    editingSummaryId = null;
+    $('summaryTitle').value = '';
     $('result').value = '';
     setStatus('genStatus', '');
+    setStatus('saveSumStatus', '');
+    renderSavedSummaries();
   };
+
+  $('saveSummary').onclick = saveCurrentSummary;
+  $('refreshSummaries').onclick = loadSummaries;
+  $('searchSavedSummary').oninput = renderSavedSummaries;
 
   $('copy').onclick = async () => {
     if (!$('result').value) return;
@@ -1659,9 +1806,10 @@
     setStatus('backupStatus', 'ກຳລັງລຶບຂໍ້ມູນທັງໝົດ...');
     try {
       const snap = await reportsCol.get();
-      for (let i = 0; i < snap.docs.length; i += 450) {
+      const targetDocs = snap.docs.filter(doc => doc.data().recordKind !== 'saved_summary');
+      for (let i = 0; i < targetDocs.length; i += 450) {
         const batch = db.batch();
-        snap.docs.slice(i, i + 450).forEach(doc => batch.delete(doc.ref));
+        targetDocs.slice(i, i + 450).forEach(doc => batch.delete(doc.ref));
         await batch.commit();
       }
       records = [];
