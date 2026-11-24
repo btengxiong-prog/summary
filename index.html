@@ -900,26 +900,63 @@
     const endMonth = MONTHS[months[months.length - 1].month - 1];
     const allDepts = getAllDepartments();
     let idx = 0;
+    const part1List = [];
+    const part2List = [];
+    const part3List = [];
 
-    const grouped = allDepts.map(dept => {
+    allDepts.forEach(dept => {
       const items = rs.filter(r => (r.department || '').trim() === dept);
-      if (!items.length) return '';
+      if (!items.length) return;
       idx++;
-      const body = items.map(r => r.text.trim()).join('\n');
-      return `${idx}. ${dept}\n${body}`;
-    }).filter(Boolean).join('\n\n');
+
+      const seen = new Set();
+      const p1 = [];
+      const p2 = [];
+      const p3 = [];
+      let section = 1;
+
+      items.forEach(r => {
+        r.text.split(/\n+/).map(l => l.trim()).filter(Boolean).forEach(line => {
+          if (/^(ພາກທີ\s*II|II\.|2\.|•?\s*(ຂໍ້ສະດວກ|ຂໍ້ຫຍຸ້ງຍາກ|ວຽກທີ່ຍັງຄົງຄ້າງ|ວຽກຄົງຄ້າງ))/i.test(line)) {
+            section = 2;
+            return;
+          }
+          if (/^(ພາກທີ\s*III|III\.|3\.|•?\s*(ທິດທາງ|ແຜນການໃນຕໍ່ໜ້າ|ແຜນວຽກຈຸດສຸມ))/i.test(line)) {
+            section = 3;
+            return;
+          }
+          if (/^(ພາກທີ\s*I|I\.|1\.|•?\s*ຜົນການຈັດຕັ້ງປະຕິບັດ)/i.test(line)) {
+            section = 1;
+            return;
+          }
+
+          const norm = line.replace(/^[-•*]\s*/, '').trim();
+          if (!norm || seen.has(norm)) return;
+          seen.add(norm);
+
+          const bullet = /^[-•]/.test(line) ? line : `- ${line}`;
+          if (section === 2) p2.push(bullet);
+          else if (section === 3) p3.push(bullet);
+          else p1.push(bullet);
+        });
+      });
+
+      if (p1.length) part1List.push(`${idx}. ${dept}\n${p1.join('\n')}`);
+      if (p2.length) part2List.push(`${dept}:\n${p2.join('\n')}`);
+      if (p3.length) part3List.push(`${dept}:\n${p3.join('\n')}`);
+    });
 
     return [
       `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`,
       '',
       'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ',
-      grouped,
+      part1List.join('\n\n') || '- ບໍ່ມີຂໍ້ມູນ',
       '',
       'ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ',
-      '- (ກະລຸນາກວດທານ ແລະ ຄັດຈ້ອນຈາກເນື້ອໃນຂ້າງເທິງ)',
+      part2List.join('\n\n') || '- ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງທີ່ລະບຸໄວ້',
       '',
       'ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ',
-      '- (ກະລຸນາກວດທານ ແລະ ຄັດຈ້ອນຈາກເນື້ອໃນຂ້າງເທິງ)'
+      part3List.join('\n\n') || '- ສືບຕໍ່ຈັດຕັ້ງປະຕິບັດແຜນວຽກຈຸດສຸມໃນໄລຍະຕໍ່ໄປໃຫ້ສຳເລັດຕາມຄາດໝາຍ'
     ].join('\n');
   }
 
@@ -971,7 +1008,7 @@
       const isGemma = /gemma/i.test(targetModel);
       const genConfig = {
         temperature: 0.2,
-        maxOutputTokens: fastTest ? 40 : 8192,
+        maxOutputTokens: fastTest ? 40 : 3072,
         ...(!simpleMode && !isGemma ? { thinkingConfig: { thinkingBudget: 0 } } : {})
       };
 
@@ -993,7 +1030,7 @@
           };
 
       const controller = new AbortController();
-      const waitMs = fastTest ? 12000 : 25000;
+      const waitMs = fastTest ? 12000 : 55000;
       const timer = setTimeout(() => controller.abort(), waitMs);
 
       try {
@@ -1108,19 +1145,27 @@
     let lastErr = '';
     let isQuotaExceeded = false;
     const attemptLogs = [];
+    const deadQuotaSet = window.__deadQuotaModels || (window.__deadQuotaModels = new Set());
 
     // 1. ລອງໃຊ້ API ຫຼັກ (Google Gemini ຫຼື Endpoint ທີ່ຕັ້ງໄວ້)
     for (let kIdx = 0; kIdx < keys.length; kIdx++) {
       const apiKey = keys[kIdx];
       const keyTag = keys.length > 1 ? ` [Key ${kIdx + 1}/${keys.length}]` : '';
 
-      const tryModel = async (targetModel, maxTries = 1) => {
+      const tryModel = async (targetModel, maxTries = 3) => {
+        const qKey = `${apiKey.slice(-6)}:${targetModel}`;
+        if (deadQuotaSet.has(qKey)) {
+          attemptLogs.push(`${targetModel}: ໂຄຕ້າເຕັມ`);
+          return { success: false, status: 429 };
+        }
+
         for (let attempt = 1; attempt <= maxTries; attempt++) {
+          const waitSec = attempt === 2 ? 2.5 : 5;
           onProgress?.(attempt > 1
-            ? `${targetModel}${keyTag} ແອອັດຊົ່ວຄາວ, ກຳລັງລອງຊ້ຳ...`
+            ? `${targetModel}${keyTag} ແອອັດ 503, ລໍຖ້າ ${waitSec} ວິນາທີແລ້ວລອງຊ້ຳ (ຮອບ ${attempt}/${maxTries})...`
             : `ກຳລັງປະມວນຜົນດ້ວຍ ${targetModel}${keyTag}...`);
           onModelUsed?.(targetModel);
-          if (attempt > 1) await sleep(1500);
+          if (attempt > 1) await sleep(waitSec * 1000);
 
           try {
             const r = await runComplete(
@@ -1130,10 +1175,15 @@
             if (r.ok) return { success: true, text: r.text };
 
             const msg = r.data?.error?.message || ('API Error: ' + r.status);
-            if (r.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
+            if (r.status === 429 || /quota/i.test(msg)) {
+              isQuotaExceeded = true;
+              deadQuotaSet.add(qKey);
+              attemptLogs.push(`${targetModel}: ໂຄຕ້າເຕັມ`);
+              return { success: false, status: 429 };
+            }
             lastErr = msg;
 
-            const reason = r.status === 429 ? 'ໂຄຕ້າເຕັມ' : (r.status === 503 ? 'ແອອັດ 503' : `ລະຫັດ ${r.status}`);
+            const reason = r.status === 503 ? 'ແອອັດ 503' : `ລະຫັດ ${r.status}`;
             if ([500, 502, 503].includes(r.status) && attempt < maxTries) continue;
             attemptLogs.push(`${targetModel}: ${reason}`);
             return { success: false, status: r.status };
@@ -1147,10 +1197,10 @@
       };
 
       // ລອງ Model ຫຼັກກ່ອນ
-      const primaryRes = await tryModel(primaryModel, 1);
+      const primaryRes = await tryModel(primaryModel, 2);
       if (primaryRes.success) return primaryRes.text;
 
-      // ຖ້າເປັນ Google Gemini ໃຫ້ສະຫຼັບໄປ Model ທີ່ຕອບໄວ ແລະ ໂຄຕ້າສູງ (ດຶງ Gemma ຂຶ້ນກ່ອນ ເພາະໂຄຕ້າແຍກຕ່າງຫາກ)
+      // ຖ້າເປັນ Google Gemini ໃຫ້ສະຫຼັບໄປ Model ທີ່ຕອບໄວ ແລະ ໂຄຕ້າສູງ
       if (isGemini) {
         try {
           onProgress?.(`ກຳລັງຄົ້ນຫາ Model ທີ່ໄວ ແລະ ວ່າງຢູ່${keyTag}...`);
@@ -1158,28 +1208,25 @@
           const rankModel = m => {
             if (/(pro|31b|27b|26b|omni|carbon|argon|neon|latest|gemini-2\.0|gemini-2\.5)/i.test(m)) return -200;
             let score = 0;
-            if (/^gemma-4.*(12b|e4b)/i.test(m)) score += 135;
-            else if (/^gemma-4.*(4b|e2b)/i.test(m)) score += 130;
-            else if (/^gemma-3.*(12b|e4b)/i.test(m)) score += 125;
-            else if (/^gemma-/i.test(m)) score += 120;
-            else if (/^gemini-3\.5-flash-lite$/i.test(m)) score += 115;
-            else if (/^gemini-4-hydrogen$/i.test(m)) score += 110;
-            else if (/^gemini-3\.1-flash-lite$/i.test(m)) score += 105;
+            if (/^gemini-3\.5-flash-lite$/i.test(m)) score += 130;
+            else if (/^gemini-4-hydrogen$/i.test(m)) score += 125;
+            else if (/^gemini-3\.1-flash-lite$/i.test(m)) score += 120;
+            else if (/^gemma-/i.test(m)) score += 115;
             else if (/^gemini-3\.8-flash$/i.test(m)) score += 95;
             else if (/^gemini-3\.6-flash$/i.test(m)) score += 90;
             else if (/flash/i.test(m)) score += 50;
-            if (/preview/i.test(m)) score -= 25;
+            if (/preview/i.test(m)) score -= 35;
             return score;
           };
 
           const backups = available
-            .filter(m => m !== primaryModel && rankModel(m) > 0)
+            .filter(m => m !== primaryModel && rankModel(m) > 0 && !deadQuotaSet.has(`${apiKey.slice(-6)}:${m}`))
             .sort((a, b) => rankModel(b) - rankModel(a))
-            .slice(0, 8);
+            .slice(0, 4);
 
           for (const alt of backups) {
-            await sleep(250);
-            const altRes = await tryModel(alt, 1);
+            await sleep(400);
+            const altRes = await tryModel(alt, 2);
             if (altRes.success) return altRes.text;
           }
         } catch (_) {}
@@ -1246,18 +1293,69 @@
       const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
       if (cfg.key) $('result').value = '';
       let activeModel = $('model').value;
-      const output = cfg.key
-        ? await callAI(buildPrompt(rs), {
-            onProgress: msg => showProgress(msg),
+      const totalChars = rs.reduce((s, r) => s + r.text.length, 0);
+      const deptGroups = [...new Set(rs.map(r => (r.department || '').trim()))];
+      let output = '';
+
+      if (!cfg.key && !cfg.groqBackupKey) {
+        output = fallbackSummary(rs);
+      } else if (totalChars > 2600 && deptGroups.length > 1) {
+        // ແບ່ງສັງເຄາະທີລະຂະແໜງການ ເພື່ອບໍ່ໃຫ້ເກີນໂຄຕ້າ TPM ຂອງ Google Free Tier
+        const { y, n, start, months } = getSelectedRange();
+        const end = months[months.length - 1];
+        const part1Sections = [];
+
+        for (let i = 0; i < deptGroups.length; i++) {
+          const deptName = deptGroups[i];
+          const deptLabel = deptName || 'ພາກສ່ວນອື່ນໆ';
+          const deptItems = rs.filter(r => (r.department || '').trim() === deptName);
+          const rawBody = deptItems.map(r => {
+            const isM = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
+            const tag = isM ? `ປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}` : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
+            return `[${tag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
+          }).join('\n\n');
+
+          showProgress(`ກຳລັງສັງເຄາະພາກສ່ວນທີ ${i + 1}/${deptGroups.length}: ${deptLabel}...`);
+          const miniPrompt = [
+            `ຈົ່ງສັງເຄາະບົດລາຍງານຂອງ "${deptLabel}" ໃຫ້ກະຊັບ ຊັດເຈນ ເປັນພາສາລາວທາງການ 100%, ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ. ຫ້າມແຕ່ງຂໍ້ມູນເພີ່ມ ແລະ ຫ້າມໃຊ້ສັນຍາລັກ Markdown (**, ###, ---).`,
+            `ຂຽນສະເພາະເນື້ອໃນຜົນການຈັດຕັ້ງປະຕິບັດ, ຂໍ້ຫຍຸ້ງຍາກ/ວຽກຄົງຄ້າງ ແລະ ທິດທາງແຜນການຂອງພາກສ່ວນນີ້ເທົ່ານັ້ນ:`,
+            rawBody
+          ].join('\n\n');
+
+          const secSummary = await callAI(miniPrompt, {
+            onProgress: msg => showProgress(`[${i + 1}/${deptGroups.length}] ${msg}`),
             onModelUsed: m => { activeModel = m; },
-            onChunk: txt => {
-              $('result').value = txt.replace(/\*\*|#{1,6}\s?/g, '');
-              $('result').scrollTop = $('result').scrollHeight;
-              showProgress(`AI (${activeModel}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
-            },
-            timeoutMs: 25000
-          })
-        : fallbackSummary(rs);
+            timeoutMs: 55000
+          });
+          part1Sections.push(`${i + 1}. ${deptLabel}\n${cleanOutput(secSummary)}`);
+          $('result').value = part1Sections.join('\n\n');
+          if (i < deptGroups.length - 1) await new Promise(r => setTimeout(r, 1500));
+        }
+
+        output = [
+          `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y})`,
+          '',
+          'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ',
+          part1Sections.join('\n\n'),
+          '',
+          'ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ',
+          '- ສັງລວມຈາກວຽກທີ່ຍັງຄົງຄ້າງຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ ທີ່ໄດ້ລະບຸໄວ້ຂ້າງເທິງ.',
+          '',
+          'ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ',
+          '- ສືບຕໍ່ຈັດຕັ້ງປະຕິບັດແຜນວຽກຈຸດສຸມໃນໄລຍະຕໍ່ໄປຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ ໃຫ້ສຳເລັດຕາມຄາດໝາຍ.'
+        ].join('\n');
+      } else {
+        output = await callAI(buildPrompt(rs), {
+          onProgress: msg => showProgress(msg),
+          onModelUsed: m => { activeModel = m; },
+          onChunk: txt => {
+            $('result').value = txt.replace(/\*\*|#{1,6}\s?/g, '');
+            $('result').scrollTop = $('result').scrollHeight;
+            showProgress(`AI (${activeModel}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
+          },
+          timeoutMs: 25000
+        });
+      }
       $('result').value = cleanOutput(output);
       const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
       setStatus(
