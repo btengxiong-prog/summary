@@ -245,7 +245,8 @@
       </select>
 
       <label>ຊື່ວຽກງານ / ພາກສ່ວນ (ຖ້າມີ)</label>
-      <input id="department" placeholder="ຕົວຢ່າງ: ພະແນກ...">
+      <input id="department" list="deptOptions" placeholder="ຕົວຢ່າງ: ພະແນກ...">
+      <datalist id="deptOptions"></datalist>
 
       <label>ອາທິດທີ</label>
       <input id="weekNo" placeholder="ຕົວຢ່າງ: 1">
@@ -327,6 +328,13 @@
             </div>
           </div>
 
+          <div>
+            <label>ກັ່ນຕອງຕາມຊື່ວຽກງານ / ພາກສ່ວນ</label>
+            <select id="filterDept">
+              <option value="">-- ທັງໝົດ (ທຸກພາກສ່ວນ) --</option>
+            </select>
+          </div>
+
           <div class="stats" id="stats"></div>
 
           <div class="actions no-print">
@@ -345,6 +353,7 @@
           <div class="actions no-print">
             <button id="copy">ຄັດລອກຂໍ້ຄວາມ</button>
             <button class="secondary" id="downloadTxt">ດາວໂຫຼດ TXT</button>
+            <button class="secondary" id="downloadDoc">ດາວໂຫຼດ Word (.doc)</button>
             <button class="secondary" id="print">ພິມ / Save PDF</button>
           </div>
         </div>
@@ -355,7 +364,7 @@
         <div class="card">
           <h2>ຕັ້ງຄ່າ AI ສຳລັບສັງເຄາະເນື້ອໃນ</h2>
           <div class="hint">
-            API Key ຈະຖືກເກັບໄວ້ສະເພາະໃນ Browser ຂອງເຄື່ອງນີ້ເພື່ອຄວາມປອດໄພ, ສ່ວນຂໍ້ມູນລາຍງານທັງໝົດຈະຖືກເກັບໄວ້ໃນ Supabase.
+            API Key ຈະຖືກເກັບໄວ້ສະເພາະໃນ Browser ຂອງເຄື່ອງນີ້ເພື່ອຄວາມປອດໄພ, ສ່ວນຂໍ້ມູນລາຍງານທັງໝົດຈະຖືກເກັບໄວ້ໃນ Firebase.
           </div>
 
           <div class="actions" style="margin-top:0; margin-bottom:10px">
@@ -371,7 +380,7 @@
 
           <label>Model</label>
           <div style="display:flex; gap:8px; align-items:center">
-            <input id="model" value="gemini-3.8-flash" style="flex:1">
+            <input id="model" value="gemini-2.5-flash" style="flex:1">
             <button type="button" class="secondary" id="loadModels" style="white-space:nowrap">ດຶງລາຍຊື່ Model</button>
           </div>
           <select id="modelPicker" class="hidden" style="margin-top:6px"></select>
@@ -392,7 +401,7 @@
         <div class="card">
           <h2>ສຳຮອງ ແລະ ກູ້ຄືນຂໍ້ມູນ (JSON)</h2>
           <p class="small">
-            ສົ່ງອອກຂໍ້ມູນຈາກ Supabase ເປັນໄຟລ໌ JSON ເພື່ອເກັບສຳຮອງໄວ້ໃນຄອມພິວເຕີ ຫຼື ນຳເຂົ້າຂໍ້ມູນເກົ່າຂຶ້ນ Supabase.
+            ສົ່ງອອກຂໍ້ມູນຈາກ Firebase ເປັນໄຟລ໌ JSON ເພື່ອເກັບສຳຮອງໄວ້ໃນຄອມພິວເຕີ ຫຼື ນຳເຂົ້າຂໍ້ມູນເກົ່າຂຶ້ນ Firebase.
           </p>
           <div class="actions">
             <button id="exportJson">ສົ່ງອອກ JSON</button>
@@ -407,7 +416,7 @@
     </main>
 
   </div>
-  <div class="footer">ລະບົບເຊື່ອມຕໍ່ຖານຂໍ້ມູນ Supabase · ຂໍ້ມູນຊິ້ງອອນລາຍທຸກອຸປະກອນ</div>
+  <div class="footer">ລະບົບເຊື່ອມຕໍ່ຖານຂໍ້ມູນ Firebase · ຂໍ້ມູນຊິ້ງອອນລາຍທຸກອຸປະກອນ</div>
 </div>
 
 <script>
@@ -572,7 +581,22 @@
   // =========================================================
   // 4. ການສະແດງຜົນລາຍການ ແລະ ສະຖິຕິ (UI Rendering)
   // =========================================================
+  function updateDeptOptions() {
+    const depts = [...new Set(records.map(r => (r.department || '').trim()).filter(Boolean))].sort();
+    const current = $('filterDept') ? $('filterDept').value : '';
+    if ($('filterDept')) {
+      $('filterDept').innerHTML =
+        '<option value="">-- ທັງໝົດ (ທຸກພາກສ່ວນ) --</option>' +
+        depts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+      if (depts.includes(current)) $('filterDept').value = current;
+    }
+    if ($('deptOptions')) {
+      $('deptOptions').innerHTML = depts.map(d => `<option value="${esc(d)}">`).join('');
+    }
+  }
+
   function renderWeekList() {
+    updateDeptOptions();
     const y = +$('year').value;
     const m = +$('month').value;
     const list = records
@@ -584,7 +608,7 @@
     } else {
       $('weekList').innerHTML = list.map(r => `
         <div class="weekitem">
-          <strong>ອາທິດ ${esc(r.week)} · ${esc(r.title || 'ບໍ່ມີຫົວຂໍ້')}</strong>
+          <strong>ອາທິດ ${esc(r.week)}${r.department ? ' [' + esc(r.department) + ']' : ''} · ${esc(r.title || 'ບໍ່ມີຫົວຂໍ້')}</strong>
           <span>${esc(r.text.slice(0, 90))}${r.text.length > 90 ? '…' : ''}</span>
           <br>
           <button class="secondary" onclick="editRecord('${r.id}')">ແກ້ໄຂ</button>
@@ -610,8 +634,12 @@
 
   function getSelectedRecords() {
     const { months } = getSelectedRange();
+    const dept = $('filterDept') ? $('filterDept').value : '';
     return records
-      .filter(r => months.some(m => m.year === r.year && m.month === r.month))
+      .filter(r =>
+        months.some(m => m.year === r.year && m.month === r.month) &&
+        (!dept || (r.department || '').trim() === dept)
+      )
       .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week) - Number(b.week));
   }
 
@@ -648,16 +676,19 @@
       official: 'ໃຊ້ສຳນວນພາສາລາຊະການທາງການ ສຸພາບ ແລະ ໜັກແໜ້ນ.'
     };
 
+    const dept = $('filterDept') ? $('filterDept').value : '';
+    const deptNote = dept ? ` (ສະເພາະວຽກງານ/ພາກສ່ວນ: ${dept})` : '';
+
     const grouped = months.map(m => {
       const items = rs.filter(r => r.year === m.year && r.month === m.month);
       const body = items.length
-        ? items.map(r => `[ອາທິດ ${r.week}${r.title ? ' | ' + r.title : ''}]\n${r.text}`).join('\n\n')
+        ? items.map(r => `[ອາທິດ ${r.week}${r.department ? ' | ' + r.department : ''}${r.title ? ' | ' + r.title : ''}]\n${r.text}`).join('\n\n')
         : '[ບໍ່ມີຂໍ້ມູນລາຍງານໃນເດືອນນີ້]';
       return `\n### ${MONTHS[m.month - 1]} ${m.year}\n${body}`;
     }).join('\n');
 
     return [
-      `ຈົ່ງສັງເຄາະບົດລາຍງານລາຍອາທິດຕໍ່ໄປນີ້ ໃຫ້ເປັນບົດສະຫຼຸບ${periodName(n)} ສຳລັບໄລຍະ ${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}. ${styleMap[style]}`,
+      `ຈົ່ງສັງເຄາະບົດລາຍງານລາຍອາທິດຕໍ່ໄປນີ້ ໃຫ້ເປັນບົດສະຫຼຸບ${periodName(n)}${deptNote} ສຳລັບໄລຍະ ${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}. ${styleMap[style]}`,
       '',
       'ຫຼັກການ:',
       '1. ອ່ານທຸກອາທິດ ແລະ ທຸກເດືອນກ່ອນສັງເຄາະ.',
@@ -730,8 +761,10 @@
         ? { 'Content-Type': 'application/json' }
         : { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
 
-      const genConfig = { temperature: 0.2 };
-      if (fastTest) genConfig.maxOutputTokens = 30;
+      const genConfig = {
+        temperature: 0.2,
+        maxOutputTokens: fastTest ? 30 : 8192
+      };
       if (/2\.5-flash/i.test(targetModel)) {
         genConfig.thinkingConfig = { thinkingBudget: 0 };
       }
@@ -767,38 +800,53 @@
           return { res, data, text: '' };
         }
 
-        // ສະແດງຂໍ້ຄວາມໄຫຼອອກມາທັນທີ (Streaming)
+        // ສະແດງຂໍ້ຄວາມໄຫຼອອກມາທັນທີ (Streaming) ພ້ອມກວດສອບຄວາມຄົບຖ້ວນ
         if (useStream && res.body) {
           clearTimeout(timer);
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
           let fullText = '';
+          let finishReason = '';
+
+          const processLine = line => {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith('data:')) return;
+            const jsonStr = trimmed.slice(5).trim();
+            if (!jsonStr || jsonStr === '[DONE]') return;
+            try {
+              const chunk = JSON.parse(jsonStr);
+              const cand = chunk.candidates?.[0];
+              if (cand?.finishReason) finishReason = cand.finishReason;
+              const parts = cand?.content?.parts || [];
+              const delta = parts.filter(p => !p.thought && p.text).map(p => p.text).join('');
+              if (delta) {
+                fullText += delta;
+                onChunk(fullText);
+              }
+            } catch (_) {}
+          };
 
           while (true) {
             const { done, value } = await reader.read();
-            if (done) break;
+            if (done) {
+              buffer += decoder.decode();
+              if (buffer.trim()) buffer.split('\n').forEach(processLine);
+              break;
+            }
             buffer += decoder.decode(value, { stream: true });
             const lines = buffer.split('\n');
             buffer = lines.pop() || '';
-
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed.startsWith('data:')) continue;
-              const jsonStr = trimmed.slice(5).trim();
-              if (!jsonStr || jsonStr === '[DONE]') continue;
-              try {
-                const chunk = JSON.parse(jsonStr);
-                const parts = chunk.candidates?.[0]?.content?.parts || [];
-                const delta = parts.filter(p => !p.thought && p.text).map(p => p.text).join('');
-                if (delta) {
-                  fullText += delta;
-                  onChunk(fullText);
-                }
-              } catch (_) {}
-            }
+            lines.forEach(processLine);
           }
-          return { res, data: {}, text: fullText || 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ.' };
+
+          if (!fullText.trim()) {
+            return { res: { ok: false, status: 502 }, data: { error: { message: 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ' } }, text: '' };
+          }
+          if (finishReason !== 'STOP') {
+            return { res: { ok: false, status: 502 }, data: { error: { message: `ຂໍ້ຄວາມຂາດຊ່ວງກ່ອນຈົບ (${finishReason || 'STREAM_CUT'})` } }, text: '' };
+          }
+          return { res, data: {}, text: fullText };
         }
 
         const data = await res.json().catch(() => ({}));
@@ -825,20 +873,26 @@
       const keyTag = keys.length > 1 ? ` [Key ${kIdx + 1}/${keys.length}]` : '';
       let reason = '';
 
-      // 1. ລອງເຊື່ອມຕໍ່ Model ຫຼັກ
-      onProgress?.(`ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}${keyTag}...`);
-      try {
-        const { res, data, text } = await sendRequest(primaryModel, apiKey);
-        if (res.ok) return text;
-        const msg = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
-        if (res.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
-        shouldFallback = [400, 404, 429, 500, 503].includes(res.status);
-        reason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : `ລະຫັດ ${res.status}`;
-        lastErr = msg;
-      } catch (err) {
-        shouldFallback = true;
-        reason = 'ຕອບຊ້າ';
-        lastErr = err.message;
+      // 1. ລອງເຊື່ອມຕໍ່ Model ຫຼັກ (ລອງຊ້ຳອັດຕະໂນມັດ 1 ຄັ້ງ ຖ້າ Stream ຂາດກາງຄັນ)
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        onProgress?.(attempt === 1
+          ? `ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}${keyTag}...`
+          : `ຂໍ້ຄວາມຂາດຊ່ວງ, ກຳລັງລອງໃໝ່ ${primaryModel}${keyTag}...`);
+        try {
+          const { res, data, text } = await sendRequest(primaryModel, apiKey);
+          if (res.ok) return text;
+          const msg = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
+          if (res.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
+          shouldFallback = [400, 404, 429, 500, 502, 503].includes(res.status);
+          reason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : (res.status === 502 ? 'ຂໍ້ຄວາມຂາດຊ່ວງ' : `ລະຫັດ ${res.status}`);
+          lastErr = msg;
+          if (res.status !== 502) break;
+        } catch (err) {
+          shouldFallback = true;
+          reason = 'ຕອບຊ້າ';
+          lastErr = err.message;
+          break;
+        }
       }
 
       // 2. ຖ້າເປັນ Gemini ໃຫ້ລອງ Model ສຳຮອງທີ່ຍັງເຫຼືອໂຄຕ້າ (ສູງສຸດ 8 ຕົວ)
@@ -848,8 +902,9 @@
           const available = await fetchGeminiModels(apiKey);
           const rankModel = m => {
             let score = 0;
-            if (/flash-lite/i.test(m)) score += 5;
-            else if (/flash/i.test(m)) score += 3;
+            if (/2\.5-flash$/i.test(m)) score += 8;
+            else if (/flash-lite/i.test(m)) score += 3;
+            else if (/flash/i.test(m)) score += 5;
             if (/2\.5/i.test(m)) score += 2;
             if (/latest/i.test(m)) score -= 2;
             if (/(preview|exp|pro|thinking)/i.test(m)) score -= 4;
@@ -896,6 +951,7 @@
   $('sumYear').onchange = updateStats;
   $('period').onchange = updateStats;
   $('startMonth').onchange = updateStats;
+  $('filterDept').onchange = updateStats;
 
   $('generate').onclick = async () => {
     const rs = getSelectedRecords();
@@ -924,7 +980,7 @@
               $('result').value = cleanOutput(txt);
               showProgress(`AI (${$('model').value}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
             },
-            timeoutMs: 30000
+            timeoutMs: 60000
           })
         : fallbackSummary(rs);
       $('result').value = cleanOutput(output);
@@ -962,6 +1018,29 @@
   };
 
   $('downloadTxt').onclick = () => downloadFile('ບົດສະຫຼຸບ.txt', $('result').value, 'text/plain;charset=utf-8');
+  $('downloadDoc').onclick = () => {
+    const content = $('result').value.trim();
+    if (!content) return setStatus('genStatus', 'ຍັງບໍ່ມີເນື້ອໃນບົດສະຫຼຸບສຳລັບດາວໂຫຼດ', 'err');
+    const paragraphs = content
+      .split(/\n+/)
+      .map(line => `<p style="margin:0 0 8pt 0; line-height:1.6;">${esc(line)}</p>`)
+      .join('');
+    const docHtml = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office"
+            xmlns:w="urn:schemas-microsoft-com:office:word"
+            xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="UTF-8">
+        <style>
+          @page { size: A4; margin: 2cm 2cm 2cm 2.5cm; }
+          body { font-family: "Phetsarath OT", "Saysettha OT", Arial, sans-serif; font-size: 12pt; color: #000; }
+        </style>
+      </head>
+      <body>${paragraphs}</body>
+      </html>`;
+    downloadFile('ບົດສະຫຼຸບ.doc', '\ufeff' + docHtml, 'application/msword;charset=utf-8');
+    setStatus('genStatus', 'ດາວໂຫຼດໄຟລ໌ Word (.doc) ສຳເລັດ', 'ok');
+  };
   $('print').onclick = () => window.print();
 
   // ຕັ້ງຄ່າ AI
@@ -969,7 +1048,7 @@
     const c = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
     $('endpoint').value = c.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
     $('apiKey').value = c.key || '';
-    $('model').value = c.model || 'gemini-3.8-flash';
+    $('model').value = c.model || 'gemini-2.5-flash';
     if (c.systemPrompt) $('systemPrompt').value = c.systemPrompt;
   }
 
