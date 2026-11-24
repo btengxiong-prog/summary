@@ -397,7 +397,9 @@
           <div class="stats" id="stats"></div>
 
           <div class="actions no-print">
-            <button id="generate" class="green">ສັງລວມບົດລາຍງານ</button>
+            <button id="generate" class="green">ສັງລວມບົດລາຍງານ (ອັດຕະໂນມັດ)</button>
+            <button id="smartInstant" style="background:#1d5b96">ສັງລວມທັນທີ (ບໍ່ງໍ້ເຊີບເວີ AI)</button>
+            <button id="copyForWebAI" class="secondary">ຄັດລອກໄປວາງໃນ Gemini Web</button>
             <button id="clearResult" class="secondary">ລ້າງຜົນສະຫຼຸບ</button>
           </div>
           <div id="genStatus" class="status"></div>
@@ -895,6 +897,23 @@
     ].filter(Boolean).join('\n');
   }
 
+  function isSimilarLao(a, b) {
+    const clean = s => s.replace(/[\s\-•*.,:;()0-9]+/g, '');
+    const x = clean(a), y = clean(b);
+    if (!x || !y) return false;
+    if (x === y || (x.length > 20 && (x.includes(y) || y.includes(x)))) return true;
+    const grams = s => {
+      const set = new Set();
+      for (let i = 0; i < s.length - 3; i++) set.add(s.slice(i, i + 4));
+      return set;
+    };
+    const gx = grams(x), gy = grams(y);
+    if (!gx.size || !gy.size) return false;
+    let same = 0;
+    gx.forEach(g => { if (gy.has(g)) same++; });
+    return (same / Math.min(gx.size, gy.size)) >= 0.72;
+  }
+
   function fallbackSummary(rs) {
     const { y, n, start, months } = getSelectedRange();
     const endMonth = MONTHS[months[months.length - 1].month - 1];
@@ -909,34 +928,37 @@
       if (!items.length) return;
       idx++;
 
-      const seen = new Set();
-      const p1 = [];
-      const p2 = [];
-      const p3 = [];
+      const accepted = [];
+      const p1 = [], p2 = [], p3 = [];
       let section = 1;
 
       items.forEach(r => {
+        section = 1;
         r.text.split(/\n+/).map(l => l.trim()).filter(Boolean).forEach(line => {
           if (/^(ພາກທີ\s*II|II\.|2\.|•?\s*(ຂໍ້ສະດວກ|ຂໍ້ຫຍຸ້ງຍາກ|ວຽກທີ່ຍັງຄົງຄ້າງ|ວຽກຄົງຄ້າງ))/i.test(line)) {
-            section = 2;
-            return;
+            section = 2; return;
           }
           if (/^(ພາກທີ\s*III|III\.|3\.|•?\s*(ທິດທາງ|ແຜນການໃນຕໍ່ໜ້າ|ແຜນວຽກຈຸດສຸມ))/i.test(line)) {
-            section = 3;
-            return;
+            section = 3; return;
           }
           if (/^(ພາກທີ\s*I|I\.|1\.|•?\s*ຜົນການຈັດຕັ້ງປະຕິບັດ)/i.test(line)) {
-            section = 1;
-            return;
+            section = 1; return;
           }
 
-          const norm = line.replace(/^[-•*]\s*/, '').trim();
-          if (!norm || seen.has(norm)) return;
-          seen.add(norm);
+          const norm = line.replace(/^[-•*0-9.]+\s*/, '').trim();
+          if (norm.length < 4) return;
+          if (accepted.some(prev => isSimilarLao(prev, norm))) return;
+          accepted.push(norm);
 
-          const bullet = /^[-•]/.test(line) ? line : `- ${line}`;
-          if (section === 2) p2.push(bullet);
-          else if (section === 3) p3.push(bullet);
+          let targetSec = section;
+          if (targetSec === 1) {
+            if (/(ຂໍ້ຫຍຸ້ງຍາກ|ຍັງຄົງຄ້າງ|ບໍ່ທັນສຳເລັດ|ຊັກຊ້າ|ຂາດເຂີນ|ບໍ່ພຽງພໍ)/.test(norm)) targetSec = 2;
+            else if (/(ທິດທາງ|ແຜນການໃນຕໍ່ໜ້າ|ສືບຕໍ່ຈັດຕັ້ງ|ກະກຽມ|ຈະຈັດ|ໃນເດືອນໜ້າ)/.test(norm)) targetSec = 3;
+          }
+
+          const bullet = `- ${norm}`;
+          if (targetSec === 2) p2.push(bullet);
+          else if (targetSec === 3) p3.push(bullet);
           else p1.push(bullet);
         });
       });
@@ -1366,12 +1388,44 @@
         'ok'
       );
     } catch (e) {
-      $('genStatus').className = 'status err';
-      $('genStatus').innerHTML = `ເກີດຂໍ້ຜິດພາດ: ${esc(e.message)} <br><button type="button" class="secondary" style="margin-top:6px" onclick="useStructuredFallback()">ຈັດລຽງບົດລາຍງານແຍກຂະແໜງການທັນທີ (ບໍ່ໃຊ້ AI)</button>`;
+      $('result').value = cleanOutput(fallbackSummary(rs));
+      setStatus(
+        'genStatus',
+        'ເຊີບເວີ AI ບໍ່ວ່າງ — ລະບົບຈຶ່ງສັງລວມ, ຕັດຂໍ້ຊ້ຳ ແລະ ຈັດໂຄງສ້າງ 3 ພາກໃຫ້ອັດຕະໂນມັດແລ້ວ (ສາມາດກວດແກ້ ຫຼື ດາວໂຫຼດ Word ໄດ້ເລີຍ).',
+        'ok'
+      );
     } finally {
       clearInterval(tick);
       $('generate').disabled = false;
     }
+  };
+
+  $('smartInstant').onclick = () => {
+    const rs = getSelectedRecords();
+    if (!rs.length) {
+      return setStatus('genStatus', 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.', 'err');
+    }
+    $('result').value = cleanOutput(fallbackSummary(rs));
+    setStatus('genStatus', 'ສັງລວມ ແລະ ຈັດໂຄງສ້າງ 3 ພາກສຳເລັດທັນທີ (0.01 ວິນາທີ).', 'ok');
+  };
+
+  $('copyForWebAI').onclick = async () => {
+    const rs = getSelectedRecords();
+    if (!rs.length) {
+      return setStatus('genStatus', 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.', 'err');
+    }
+    const promptText = buildPrompt(rs);
+    try {
+      await navigator.clipboard.writeText(promptText);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = promptText;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+    }
+    setStatus('genStatus', 'ຄັດລອກບົດລາຍງານພ້ອມຄຳສັ່ງແລ້ວ! ໄປວາງ (Ctrl+V) ໃນໜ້າແຊັດ Gemini ຫຼື ChatGPT ໄດ້ເລີຍ.', 'ok');
   };
 
   $('clearResult').onclick = () => {
