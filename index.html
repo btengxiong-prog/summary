@@ -131,12 +131,53 @@
     .tab.active { background: var(--navy); color: #fff; }
 
     /* ===== ລາຍການອາທິດ & ສະຖິຕິ ===== */
+    .filter-box {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+    }
+    .filter-box input, .filter-box select {
+      padding: 7px 9px;
+      font-size: 12px;
+    }
+    .dept-tracker {
+      margin-top: 8px;
+      background: #f8fafd;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 7px 9px;
+      font-size: 12px;
+    }
+    .dept-tracker summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--navy);
+      user-select: none;
+    }
+    .dept-tracker-list {
+      margin-top: 7px;
+      max-height: 160px;
+      overflow: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .dept-badge {
+      padding: 4px 6px;
+      border-radius: 5px;
+      font-size: 11px;
+      line-height: 1.4;
+    }
+    .dept-badge.done { background: #e8f7f0; color: #136c4b; }
+    .dept-badge.miss { background: #fff4f4; color: #9c3838; cursor: pointer; }
+    .dept-badge.miss:hover { background: #ffe6e6; }
     .weeklist {
       display: flex;
       flex-direction: column;
       gap: 7px;
-      margin-top: 12px;
-      max-height: 45vh;
+      margin-top: 10px;
+      max-height: 40vh;
       overflow: auto;
     }
     .weekitem {
@@ -280,9 +321,18 @@
       <div id="dbStatus" class="status"></div>
 
       <div class="actions" style="justify-content:space-between; align-items:center; margin-top:16px">
-        <h3 style="margin:0">ລາຍການອາທິດທີ່ບັນທຶກ</h3>
+        <h3 style="margin:0">ລາຍການບົດລາຍງານ</h3>
         <button class="secondary" id="refreshDb" style="padding:4px 8px; font-size:11px">ໂຫຼດໃໝ່</button>
       </div>
+
+      <div class="filter-box">
+        <select id="filterDept">
+          <option value="">-- ທຸກຂະແໜງການ / ສູນ --</option>
+        </select>
+        <input id="searchReport" type="search" placeholder="ຄົ້ນຫາຫົວຂໍ້ ຫຼື ເນື້ອໃນ...">
+      </div>
+
+      <div id="deptTracker"></div>
       <div id="weekList" class="weeklist"></div>
     </aside>
 
@@ -559,8 +609,34 @@
       return alert('ກະລຸນາປ້ອນປີ, ອາທິດ ແລະ ເນື້ອໃນລາຍງານໃຫ້ຄົບຖ້ວນ');
     }
 
+    // ກວດສອບບົດລາຍງານຊ້ຳຊ້ອນ (ປີ, ເດືອນ, ພາກສ່ວນ, ປະເພດ ແລະ ອາທິດ ດຽວກັນ)
+    const duplicate = records.find(r => {
+      if (r.id === editingId) return false;
+      const rType = r.reportType || (r.week ? 'weekly' : 'monthly');
+      return (
+        r.year === year &&
+        r.month === month &&
+        (r.department || '').trim() === department &&
+        rType === reportType &&
+        (reportType === 'monthly' || String(r.week) === week)
+      );
+    });
+
+    if (duplicate) {
+      const periodLabel = reportType === 'monthly' ? 'ປະຈຳເດືອນ' : `ອາທິດທີ ${week}`;
+      const ok = confirm(
+        `ພົບຂໍ້ມູນຊ້ຳຊ້ອນ!\n` +
+        `ພາກສ່ວນ: ${department}\n` +
+        `ໄລຍະ: ${periodLabel} ເດືອນ ${MONTHS[month - 1]} ${year}\n\n` +
+        `ຕ້ອງການ "ບັນທຶກທັບ" ຂໍ້ມູນເກົ່າທີ່ມີຢູ່ແລ້ວບໍ?`
+      );
+      if (!ok) return;
+    }
+
+    const targetId = editingId || (duplicate ? duplicate.id : ('w' + Date.now() + Math.random().toString(16).slice(2)));
+
     const row = {
-      id: editingId || ('w' + Date.now() + Math.random().toString(16).slice(2)),
+      id: targetId,
       year,
       month,
       reportType,
@@ -577,8 +653,8 @@
     try {
       await reportsCol.doc(row.id).set(row);
 
-      if (editingId) {
-        records = records.map(r => (r.id === editingId ? row : r));
+      if (editingId || duplicate) {
+        records = records.map(r => (r.id === targetId ? row : r));
       } else {
         records.push(row);
       }
@@ -644,14 +720,58 @@
       '<option value="">-- ເລືອກຂະແໜງການ / ສູນ / ຫ້ອງການ --</option>' +
       allDepts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
     if (cur) $('department').value = cur;
+
+    if ($('filterDept')) {
+      const curFilter = $('filterDept').value;
+      $('filterDept').innerHTML =
+        '<option value="">-- ສະແດງທຸກພາກສ່ວນ --</option>' +
+        allDepts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+      if (curFilter) $('filterDept').value = curFilter;
+    }
   }
+
+  window.pickMissingDept = function (deptName) {
+    $('department').value = deptName;
+    $('weekTitle').focus();
+  };
 
   function renderWeekList() {
     initDeptSelect();
     const y = +$('year').value;
     const m = +$('month').value;
-    const list = records
-      .filter(r => r.year === y && r.month === m)
+    const filterDept = ($('filterDept')?.value || '').trim();
+    const keyword = ($('searchReport')?.value || '').trim().toLowerCase();
+
+    const monthRecords = records.filter(r => r.year === y && r.month === m);
+
+    // ສະແດງສະຖານະພາກສ່ວນທີ່ສົ່ງແລ້ວ ແລະ ຍັງບໍ່ທັນສົ່ງໃນເດືອນທີ່ເລືອກ
+    if ($('deptTracker')) {
+      const submittedSet = new Set(monthRecords.map(r => (r.department || '').trim()).filter(Boolean));
+      const doneCount = DEPARTMENTS.filter(d => submittedSet.has(d)).length;
+      const trackerItems = DEPARTMENTS.map(d => {
+        const isDone = submittedSet.has(d);
+        return isDone
+          ? `<div class="dept-badge done">✓ ${esc(d)}</div>`
+          : `<div class="dept-badge miss" title="ກົດເພື່ອເລືອກປ້ອນຂໍ້ມູນພາກສ່ວນນີ້" onclick="pickMissingDept('${esc(d)}')">✗ ${esc(d)}</div>`;
+      }).join('');
+
+      $('deptTracker').innerHTML = `
+        <details class="dept-tracker">
+          <summary>ສະຖານະການສົ່ງ: ${doneCount}/${DEPARTMENTS.length} ພາກສ່ວນ (ກົດເບິ່ງລາຍຊື່)</summary>
+          <div class="dept-tracker-list">${trackerItems}</div>
+        </details>
+      `;
+    }
+
+    const list = monthRecords
+      .filter(r => {
+        if (filterDept && (r.department || '').trim() !== filterDept) return false;
+        if (keyword) {
+          const hay = `${r.department || ''} ${r.title || ''} ${r.text || ''}`.toLowerCase();
+          if (!hay.includes(keyword)) return false;
+        }
+        return true;
+      })
       .sort((a, b) => {
         const typeA = (a.reportType || (a.week ? 'weekly' : 'monthly')) === 'monthly' ? 0 : 1;
         const typeB = (b.reportType || (b.week ? 'weekly' : 'monthly')) === 'monthly' ? 0 : 1;
@@ -659,7 +779,7 @@
       });
 
     if (!list.length) {
-      $('weekList').innerHTML = '<div class="small">ຍັງບໍ່ມີລາຍງານໃນເດືອນນີ້</div>';
+      $('weekList').innerHTML = `<div class="small">${monthRecords.length ? 'ບໍ່ພົບບົດລາຍງານທີ່ກົງກັບເງື່ອນໄຂຄົ້ນຫາ' : 'ຍັງບໍ່ມີລາຍງານໃນເດືອນນີ້'}</div>`;
     } else {
       $('weekList').innerHTML = list.map(r => {
         const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
@@ -801,14 +921,14 @@
     cachedGeminiModels = (data.models || [])
       .filter(m =>
         m.supportedGenerationMethods?.includes('generateContent') &&
-        /(gemini|gemma-3)/i.test(m.name) &&
-        !/(embedding|image|tts|audio|vision|robotics|computer-use|live|nano)/i.test(m.name)
+        /(gemini|gemma)/i.test(m.name) &&
+        !/(embedding|image|tts|audio|vision|robotics|computer-use|live|nano|customtools|deep-research)/i.test(m.name)
       )
       .map(m => m.name.replace(/^models\//, ''));
     return cachedGeminiModels;
   }
 
-  async function callAI(prompt, { onProgress = null, onChunk = null, timeoutMs = 30000, fastTest = false } = {}) {
+  async function callAI(prompt, { onProgress = null, onChunk = null, onModelUsed = null, timeoutMs = 25000, fastTest = false } = {}) {
     const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
     const keys = String(cfg.key || '').split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
     if (!keys.length) throw new Error('ຍັງບໍ່ໄດ້ປ້ອນ API Key');
@@ -820,8 +940,20 @@
       : (cfg.systemPrompt || 'ຊ່ວຍສັງເຄາະລາຍງານພາສາລາວ ໂດຍບໍ່ແຕ່ງຂໍ້ມູນ.');
     const isGemini = endpoint.includes('generativelanguage.googleapis.com');
 
-    async function sendRequest(targetModel, apiKey, allowStream = true) {
-      const useStream = isGemini && allowStream && typeof onChunk === 'function';
+    let savedPrefix = '';
+
+    function getActivePrompt() {
+      if (!savedPrefix) return prompt;
+      return `${prompt}\n\n---\nຂໍ້ຄວາມທີ່ຂຽນໄວ້ແລ້ວກ່ອນໜ້ານີ້ (ໃຫ້ຂຽນຕໍ່ຈາກບັນທັດສຸດທ້າຍນີ້ທັນທີ ຈົນຈົບຄົບທັງ 3 ພາກ ໂດຍບໍ່ຕ້ອງເລີ່ມຕົ້ນຫົວບົດໃໝ່):\n${savedPrefix.slice(-900)}`;
+    }
+
+    function mergeWithPrefix(newPart) {
+      return savedPrefix ? `${savedPrefix}\n${newPart.trimStart()}` : newPart;
+    }
+
+    async function sendRequest(targetModel, apiKey, simpleMode = false) {
+      const activePrompt = getActivePrompt();
+      const useStream = isGemini && typeof onChunk === 'function';
       const url = isGemini
         ? `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(targetModel)}:${useStream ? 'streamGenerateContent?alt=sse&' : 'generateContent?'}key=${encodeURIComponent(apiKey)}`
         : endpoint;
@@ -835,19 +967,19 @@
         temperature: 0.2,
         maxOutputTokens: fastTest ? 30 : (isGemma ? 8192 : 16384)
       };
-      if (/2\.5-flash/i.test(targetModel)) {
+      if (!simpleMode && /^gemini-2\.5-flash$/i.test(targetModel)) {
         genConfig.thinkingConfig = { thinkingBudget: 0 };
       }
 
       const payload = isGemini
-        ? (isGemma
+        ? ((isGemma || simpleMode)
             ? {
-                contents: [{ role: 'user', parts: [{ text: `${sysPrompt}\n\n${prompt}` }] }],
+                contents: [{ role: 'user', parts: [{ text: `${sysPrompt}\n\n${activePrompt}` }] }],
                 generationConfig: genConfig
               }
             : {
                 system_instruction: { parts: [{ text: sysPrompt }] },
-                contents: [{ role: 'user', parts: [{ text: prompt }] }],
+                contents: [{ role: 'user', parts: [{ text: activePrompt }] }],
                 safetySettings: [
                   { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_NONE' },
                   { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_NONE' },
@@ -862,12 +994,15 @@
             ...(fastTest ? { max_tokens: 30 } : {}),
             messages: [
               { role: 'system', content: sysPrompt },
-              { role: 'user', content: prompt }
+              { role: 'user', content: activePrompt }
             ]
           };
 
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      // ຖ້າເຊີບເວີບໍ່ຕອບພາຍໃນ 15 ວິນາທີ (ຫຼື timeoutMs) ໃຫ້ຕັດທັນທີເພື່ອບໍ່ໃຫ້ຄ້າງ
+      const initTimeout = fastTest ? timeoutMs : Math.min(timeoutMs, 15000);
+      let timer = setTimeout(() => controller.abort(), initTimeout);
+
       try {
         const res = await fetch(url, {
           method: 'POST',
@@ -877,18 +1012,30 @@
         });
 
         if (!res.ok) {
+          if (isGemini && res.status === 400 && !simpleMode) {
+            clearTimeout(timer);
+            return sendRequest(targetModel, apiKey, true);
+          }
           const data = await res.json().catch(() => ({}));
           return { res, data, text: '' };
         }
 
-        // ສະແດງຂໍ້ຄວາມໄຫຼອອກມາທັນທີ (Streaming) ພ້ອມກວດສອບຄວາມຄົບຖ້ວນ
         if (useStream && res.body) {
-          clearTimeout(timer);
           const reader = res.body.getReader();
           const decoder = new TextDecoder();
           let buffer = '';
           let fullText = '';
           let finishReason = '';
+          let stalled = false;
+
+          const resetStallTimer = () => {
+            clearTimeout(timer);
+            timer = setTimeout(() => {
+              stalled = true;
+              controller.abort();
+            }, 12000); // ຖ້າຂໍ້ຄວາມຢຸດໄຫຼເກີນ 12 ວິນາທີ ໃຫ້ຕັດທັນທີ
+          };
+          resetStallTimer();
 
           const processLine = line => {
             const trimmed = line.trim();
@@ -903,41 +1050,52 @@
               const delta = parts.filter(p => !p.thought && p.text).map(p => p.text).join('');
               if (delta) {
                 fullText += delta;
-                onChunk(fullText);
+                onChunk(mergeWithPrefix(fullText));
               }
             } catch (_) {}
           };
 
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) {
-              buffer += decoder.decode();
-              if (buffer.trim()) buffer.split('\n').forEach(processLine);
-              break;
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                buffer += decoder.decode();
+                if (buffer.trim()) buffer.split('\n').forEach(processLine);
+                break;
+              }
+              resetStallTimer();
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split('\n');
+              buffer = lines.pop() || '';
+              lines.forEach(processLine);
             }
-            buffer += decoder.decode(value, { stream: true });
-            const lines = buffer.split('\n');
-            buffer = lines.pop() || '';
-            lines.forEach(processLine);
+          } catch (readErr) {
+            if (!stalled && readErr.name !== 'AbortError') throw readErr;
           }
 
+          const combined = mergeWithPrefix(fullText);
           if (!fullText.trim()) {
-            return { res: { ok: false, status: 502 }, data: { error: { message: 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ' } }, text: '' };
+            return { res: { ok: false, status: 502 }, data: { error: { message: 'AI ຕອບຊ້າ ຫຼື ບໍ່ສົ່ງເນື້ອຫາກັບມາ' } }, text: '' };
           }
-          if (finishReason !== 'STOP') {
-            return { res: { ok: false, status: 502 }, data: { error: { message: `ຂໍ້ຄວາມຂາດຊ່ວງກ່ອນຈົບ (${finishReason || 'STREAM_CUT'})` } }, text: '' };
+          // ຖ້າຂາດຊ່ວງກາງຄັນແຕ່ໄດ້ຂໍ້ຄວາມມາແລ້ວ >= 100 ຕົວອັກສອນ ໃຫ້ເກັບໄວ້ແລ້ວຂຽນຕໍ່ທັນທີ
+          if (finishReason !== 'STOP' || stalled) {
+            if (combined.trim().length >= 100) {
+              const lastNl = combined.lastIndexOf('\n');
+              savedPrefix = lastNl > 80 ? combined.slice(0, lastNl) : combined;
+            }
+            return { res: { ok: false, status: 502 }, data: { error: { message: 'ຂາດຊ່ວງກາງຄັນ' } }, text: savedPrefix };
           }
-          return { res, data: {}, text: fullText };
+          return { res, data: {}, text: combined };
         }
 
         const data = await res.json().catch(() => ({}));
-        const text = isGemini
+        const rawText = isGemini
           ? (data.candidates?.[0]?.content?.parts?.filter(p => !p.thought && p.text).map(p => p.text).join('') || 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ.')
           : (data.choices?.[0]?.message?.content || 'AI ບໍ່ໄດ້ສົ່ງເນື້ອຫາກັບມາ.');
-        return { res, data, text };
+        return { res, data, text: mergeWithPrefix(rawText) };
       } catch (err) {
         if (err.name === 'AbortError') {
-          throw new Error(`ເຊື່ອມຕໍ່ໝົດເວລາ (${timeoutMs / 1000} ວິນາທີ)`);
+          throw new Error('ເຊີບເວີຕອບຊ້າ (ເກີນ 15 ວິນາທີ)');
         }
         throw err;
       } finally {
@@ -948,78 +1106,92 @@
     let lastErr = '';
     let isQuotaExceeded = false;
     let shouldFallback = false;
+    const attemptLogs = [];
 
     for (let kIdx = 0; kIdx < keys.length; kIdx++) {
       const apiKey = keys[kIdx];
       const keyTag = keys.length > 1 ? ` [Key ${kIdx + 1}/${keys.length}]` : '';
       let reason = '';
-
       const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-      // 1. ລອງເຊື່ອມຕໍ່ Model ຫຼັກ (ສູງສຸດ 3 ຮອບ, ຖ້າ 503 ແອອັດ ໃຫ້ລໍຖ້າແລ້ວດຶງແບບເຕັມສະບັບ)
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        const allowStream = attempt === 1;
+      // 1. ລອງ Model ຫຼັກ (ສູງສຸດ 2 ຮອບ, ຖ້າຂາດຊ່ວງກາງຄັນຈະຂຽນຕໍ່ຈາກຈຸດເດີມທັນທີ)
+      for (let attempt = 1; attempt <= 2; attempt++) {
         if (attempt > 1) {
-          onProgress?.(`ເຊີບເວີ ${primaryModel}${keyTag} ແອອັດຊົ່ວຄາວ, ກຳລັງລອງໃໝ່ຮອບທີ ${attempt}...`);
-          await sleep(attempt === 2 ? 1500 : 2500);
+          onProgress?.(savedPrefix
+            ? `ກຳລັງໃຫ້ ${primaryModel}${keyTag} ຂຽນຕໍ່ຈາກຈຸດທີ່ຄ້າງ...`
+            : `ເຊີບເວີ ${primaryModel}${keyTag} ແອອັດ, ກຳລັງລອງໃໝ່...`);
+          await sleep(1000);
         } else {
           onProgress?.(`ກຳລັງເຊື່ອມຕໍ່ ${primaryModel}${keyTag}...`);
         }
         try {
-          const { res, data, text } = await sendRequest(primaryModel, apiKey, allowStream);
+          onModelUsed?.(primaryModel);
+          const { res, data, text } = await sendRequest(primaryModel, apiKey);
           if (res.ok) return text;
           const msg = data.error?.message || data[0]?.error?.message || ('API Error: ' + res.status);
           if (res.status === 429 || /quota/i.test(msg)) isQuotaExceeded = true;
           shouldFallback = [400, 404, 429, 500, 502, 503].includes(res.status);
-          reason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : (res.status === 503 ? 'ເຊີບເວີແອອັດ' : (res.status === 502 ? 'ຂໍ້ຄວາມຂາດຊ່ວງ' : `ລະຫັດ ${res.status}`));
+          reason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : (res.status === 503 ? 'ແອອັດ 503' : (savedPrefix ? 'ຂາດຊ່ວງ' : `ລະຫັດ ${res.status}`));
           lastErr = msg;
+          attemptLogs.push(`${primaryModel}: ${reason}`);
           if (![502, 503].includes(res.status)) break;
         } catch (err) {
           shouldFallback = true;
           reason = 'ຕອບຊ້າ';
           lastErr = err.message;
-          if (attempt === 3) break;
+          attemptLogs.push(`${primaryModel}: ${reason}`);
+          if (attempt === 2) break;
         }
       }
 
-      // 2. ຖ້າ Model ຫຼັກຍັງແອອັດ ໃຫ້ສະຫຼັບໄປໃຊ້ Model ສຳຮອງທີ່ໝັ້ນຄົງ (ສູງສຸດ 6 ຕົວ) ໂດຍບໍ່ບັນທຶກທັບຄ່າຫຼັກ
+      // 2. ສະຫຼັບໄປໃຊ້ Model ທີ່ຕອບໄວ (ຕັດໂມເດວໃຫຍ່ 31B/27B/Pro ທີ່ຊ້າອອກ)
       if (isGemini && shouldFallback) {
         try {
-          onProgress?.(`${primaryModel}${keyTag} (${reason}), ກຳລັງຊອກ Model ສຳຮອງ...`);
+          onProgress?.(`${primaryModel}${keyTag} (${reason}), ກຳລັງສະຫຼັບ Model ທີ່ໄວກວ່າ...`);
           const available = await fetchGeminiModels(apiKey);
           const rankModel = m => {
             let score = 0;
-            if (/^gemini-2\.5-flash$/i.test(m)) score += 10;
-            else if (/^gemini-2\.5-flash-lite$/i.test(m)) score += 9;
-            else if (/^gemini-2\.0-flash$/i.test(m)) score += 8;
-            else if (/gemma-3-27b-it$/i.test(m)) score += 7;
-            else if (/flash/i.test(m)) score += 5;
-            if (/latest/i.test(m)) score -= 2;
-            if (/(preview|exp|pro|thinking)/i.test(m)) score -= 8;
+            if (/^gemini-3\.5-flash-lite$/i.test(m)) score += 110;
+            else if (/^gemini-3\.5-flash$/i.test(m)) score += 105;
+            else if (/^gemini-2\.5-flash$/i.test(m)) score += 100;
+            else if (/gemma-3-12b-it$/i.test(m)) score += 90;
+            else if (/gemma-3-4b-it$/i.test(m)) score += 85;
+            else if (/flash/i.test(m)) score += 60;
+            if (/preview/i.test(m)) score -= 35;
+            if (/(pro|31b|27b|latest|gemini-2\.0|2\.5-flash-lite)/i.test(m)) score -= 100; // ຫຼີກລ່ຽງໂມເດວຊ້າ ແລະ ໂມເດວທີ່ປິດແລ້ວ
             return score;
           };
           const backups = available
-            .filter(m => m !== primaryModel)
+            .filter(m => m !== primaryModel && rankModel(m) > 0)
             .sort((a, b) => rankModel(b) - rankModel(a))
-            .slice(0, 6);
+            .slice(0, 3);
 
           for (const alt of backups) {
-            onProgress?.(`ກຳລັງສະຫຼັບໄປໃຊ້ ${alt}${keyTag}...`);
-            await sleep(600);
+            onProgress?.(savedPrefix
+              ? `ກຳລັງໃຫ້ ${alt}${keyTag} ຂຽນຕໍ່ໃຫ້ຈົບ...`
+              : `ກຳລັງສະຫຼັບໄປໃຊ້ ${alt}${keyTag}...`);
+            onModelUsed?.(alt);
+            await sleep(400);
             try {
-              const { res, text } = await sendRequest(alt, apiKey, false);
+              const { res, data, text } = await sendRequest(alt, apiKey);
               if (res.ok) return text;
-            } catch (_) {}
+              const altReason = res.status === 429 ? 'ໂຄຕ້າເຕັມ' : (res.status === 503 ? 'ແອອັດ 503' : `ລະຫັດ ${res.status}`);
+              attemptLogs.push(`${alt}: ${altReason}`);
+              if (data?.error?.message) lastErr = data.error.message;
+            } catch (e) {
+              attemptLogs.push(`${alt}: ຕອບຊ້າ`);
+            }
           }
         } catch (_) {}
       }
     }
 
-    if (isQuotaExceeded) {
-      throw new Error('ໂຄຕ້າຟຣີຕໍ່ມື້ຂອງ API Key ນີ້ໝົດແລ້ວ (20 ຄັ້ງ/ມື້). ແນະນຳໃຫ້ກົດ "ໃຊ້ Groq" ຫຼື ເພີ່ມ API Key ຈາກບັນຊີ Gmail ອື່ນ (' + lastErr + ')');
+    const summaryLog = [...new Set(attemptLogs)].slice(0, 4).join(', ');
+    if (isQuotaExceeded && !attemptLogs.some(l => l.includes('503'))) {
+      throw new Error('ໂຄຕ້າຟຣີຕໍ່ມື້ຂອງ API Key ນີ້ໝົດແລ້ວ. ແນະນຳໃຫ້ກົດ "ໃຊ້ Groq" ຫຼື ເພີ່ມ API Key ຈາກບັນຊີ Gmail ອື່ນ (' + summaryLog + ')');
     }
     throw new Error(shouldFallback
-      ? 'ເຊີບເວີ AI ແອອັດຊົ່ວຄາວ, ກະລຸນາກົດ "ດຶງລາຍຊື່ Model" ເພື່ອເລືອກຕົວອື່ນ (' + lastErr + ')'
+      ? `ເຊີບເວີ Google AI ແອອັດຊົ່ວຄາວ (${summaryLog}) — ແນະນຳໃຫ້ກົດ "ໃຊ້ Groq" ໃນແຖບຕັ້ງຄ່າ AI ຈະປະມວນຜົນຈົບໃນ 2 ວິນາທີ`
       : lastErr);
   }
 
@@ -1031,6 +1203,8 @@
   $('clearForm').onclick = clearForm;
   $('year').onchange = renderWeekList;
   $('month').onchange = renderWeekList;
+  $('filterDept').onchange = renderWeekList;
+  $('searchReport').oninput = renderWeekList;
   $('reportType').onchange = toggleWeekInput;
   $('sumYear').onchange = updateStats;
   $('period').onchange = updateStats;
@@ -1056,14 +1230,17 @@
     try {
       const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
       if (cfg.key) $('result').value = '';
+      let activeModel = $('model').value;
       const output = cfg.key
         ? await callAI(buildPrompt(rs), {
             onProgress: msg => showProgress(msg),
+            onModelUsed: m => { activeModel = m; },
             onChunk: txt => {
-              $('result').value = cleanOutput(txt);
-              showProgress(`AI (${$('model').value}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
+              $('result').value = txt.replace(/\*\*|#{1,6}\s?/g, '');
+              $('result').scrollTop = $('result').scrollHeight;
+              showProgress(`AI (${activeModel}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
             },
-            timeoutMs: 90000
+            timeoutMs: 25000
           })
         : fallbackSummary(rs);
       $('result').value = cleanOutput(output);
@@ -1071,7 +1248,7 @@
       setStatus(
         'genStatus',
         cfg.key
-          ? `ສັງເຄາະດ້ວຍ AI (${$('model').value}) ສຳເລັດໃນ ${totalSec} ວິນາທີ. ກະລຸນາກວດທານກ່ອນນຳໃຊ້.`
+          ? `ສັງເຄາະດ້ວຍ AI (${activeModel}) ສຳເລັດໃນ ${totalSec} ວິນາທີ. ກະລຸນາກວດທານກ່ອນນຳໃຊ້.`
           : 'ສ້າງຜົນລວມພື້ນຖານແລ້ວ (ຍັງບໍ່ໄດ້ໃຊ້ AI).',
         'ok'
       );
@@ -1104,10 +1281,31 @@
   $('downloadDoc').onclick = () => {
     const content = $('result').value.trim();
     if (!content) return setStatus('genStatus', 'ຍັງບໍ່ມີເນື້ອໃນບົດສະຫຼຸບສຳລັບດາວໂຫຼດ', 'err');
-    const paragraphs = content
-      .split(/\n+/)
-      .map(line => `<p style="margin:0 0 8pt 0; line-height:1.6;">${esc(line)}</p>`)
-      .join('');
+
+    const { y, n, start, months } = getSelectedRange();
+    const end = months[months.length - 1];
+    const periodTitle = n === 1
+      ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
+      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
+
+    const lines = content.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    // ຕັດຫົວບົດຊ້ຳຖ້າ AI ຂຽນຂຶ້ນຕົ້ນດ້ວຍ "ບົດສະຫຼຸບ..."
+    if (lines.length && /^ບົດສະຫຼຸບ/.test(lines[0])) {
+      lines.shift();
+    }
+
+    const paragraphs = lines.map(line => {
+      const isMajorPart = /^ພາກທີ\s+[I|V|X|1-3]/i.test(line);
+      const isSubHeading = /^([0-9]+\.|[ກ-ຮ]\.|•|-)\s*/.test(line);
+      if (isMajorPart) {
+        return `<p style="margin:12pt 0 6pt 0; font-weight:bold; font-size:13pt; line-height:1.5;">${esc(line)}</p>`;
+      }
+      if (isSubHeading) {
+        return `<p style="margin:4pt 0 4pt 0.6cm; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+      }
+      return `<p style="margin:0 0 6pt 0; text-indent:1.25cm; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+    }).join('');
+
     const docHtml = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office"
             xmlns:w="urn:schemas-microsoft-com:office:word"
@@ -1117,12 +1315,52 @@
         <style>
           @page { size: A4; margin: 2cm 2cm 2cm 2.5cm; }
           body { font-family: "Phetsarath OT", "Saysettha OT", Arial, sans-serif; font-size: 12pt; color: #000; }
+          table.hdr { width: 100%; border-collapse: collapse; margin-bottom: 14pt; }
+          table.hdr td { vertical-align: top; padding: 0; font-size: 12pt; line-height: 1.5; }
         </style>
       </head>
-      <body>${paragraphs}</body>
+      <body>
+        <div style="text-align:center; font-weight:bold; line-height:1.45; margin-bottom:12pt;">
+          <div>ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ</div>
+          <div>ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນະຖາວອນ</div>
+          <div style="font-weight:normal; letter-spacing:1pt;">-------===ooo===-------</div>
+        </div>
+
+        <table class="hdr">
+          <tr>
+            <td style="width:58%;">
+              <div>ກະຊວງສຶກສາທິການ ແລະ ກິລາ</div>
+              <div style="font-weight:bold;">ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງໄຊຍະບູລີ</div>
+            </td>
+            <td style="width:42%; text-align:right;">
+              <div>ເລກທີ ............/ສກຂ.ຊຍ</div>
+              <div>ໄຊຍະບູລີ, ວັນທີ ....../....../${y}</div>
+            </td>
+          </tr>
+        </table>
+
+        <div style="text-align:center; font-weight:bold; margin:10pt 0 14pt 0; line-height:1.45;">
+          <div style="font-size:15pt;">ບົດສະຫຼຸບ</div>
+          <div style="font-size:13pt;">ການຈັດຕັ້ງປະຕິບັດວຽກງານ${esc(periodTitle)}</div>
+        </div>
+
+        ${paragraphs}
+
+        <table style="width:100%; border-collapse:collapse; margin-top:24pt;">
+          <tr>
+            <td style="width:50%;"></td>
+            <td style="width:50%; text-align:center; font-weight:bold; line-height:1.5;">
+              <div>ຫົວໜ້າພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ</div>
+              <br><br><br>
+            </td>
+          </tr>
+        </table>
+      </body>
       </html>`;
-    downloadFile('ບົດສະຫຼຸບ.doc', '\ufeff' + docHtml, 'application/msword;charset=utf-8');
-    setStatus('genStatus', 'ດາວໂຫຼດໄຟລ໌ Word (.doc) ສຳເລັດ', 'ok');
+
+    const fileName = `ບົດສະຫຼຸບ_${periodTitle.replace(/\s+/g, '_')}.doc`;
+    downloadFile(fileName, '\ufeff' + docHtml, 'application/msword;charset=utf-8');
+    setStatus('genStatus', 'ດາວໂຫຼດໄຟລ໌ Word (.doc) ຮູບແບບທາງການສຳເລັດ', 'ok');
   };
   $('print').onclick = () => window.print();
 
