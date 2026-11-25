@@ -23,17 +23,24 @@
 
     /* ===== ພື້ນຖານໜ້າເວັບ ===== */
     * { box-sizing: border-box; }
-    body {
+    html, body {
+      height: 100%;
       margin: 0;
+      overflow: hidden;
+    }
+    body {
       background: var(--bg);
       color: var(--ink);
       font-family: "Phetsarath OT", "Noto Sans Lao", "Lao UI", Arial, sans-serif;
       line-height: 1.65;
+      display: flex;
+      flex-direction: column;
     }
 
     /* ===== ໜ້າຈໍເຂົ້າສູ່ລະບົບ (Login Screen) ===== */
     .login-screen {
-      min-height: 100vh;
+      flex: 1;
+      overflow-y: auto;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -141,8 +148,7 @@
 
     /* ===== ສ່ວນຫົວ (Header) ===== */
     header {
-      position: sticky;
-      top: 0;
+      flex-shrink: 0;
       z-index: 1000;
       background: linear-gradient(120deg, #122943, #245b91);
       color: #fff;
@@ -181,7 +187,8 @@
       max-width: 100%;
       margin: 0;
       padding: 0;
-      height: calc(100vh - 82px);
+      flex: 1;
+      min-height: 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -512,9 +519,10 @@
 
     /* ===== ຮອງຮັບໜ້າຈໍມືຖື ===== */
     @media (max-width: 850px) {
+      html, body { height: auto; overflow: visible; display: block; }
       .shell { height: auto; overflow: visible; display: block; }
       .layout { display: grid; grid-template-columns: 1fr; height: auto; }
-      .panel, main { height: auto; overflow-y: visible; padding-right: 0; }
+      .panel, main { height: auto; overflow-y: visible; padding: 16px; }
       .footer { margin-top: 16px; }
       .weeklist { max-height: 250px; }
       .two { grid-template-columns: 1fr; }
@@ -522,10 +530,11 @@
 
     /* ===== ຮູບແບບຕອນສັ່ງພິມ (Print / PDF) ===== */
     @media print {
+      html, body { height: auto !important; overflow: visible !important; display: block !important; }
       header, .panel, .tabs, .no-print, .footer { display: none !important; }
       .shell { max-width: none; height: auto !important; overflow: visible !important; display: block !important; margin: 0; padding: 0; }
       .layout { display: block; height: auto !important; }
-      main { height: auto !important; overflow: visible !important; }
+      main { height: auto !important; overflow: visible !important; padding: 0 !important; }
       .card { border: 0; box-shadow: none; padding: 0; }
       #result { border: 0; padding: 0; }
     }
