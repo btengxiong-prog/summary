@@ -570,6 +570,94 @@
         color: #000;
       }
     }
+
+    /* ===== ປ໋ອບອັບແຈ້ງເຕືອນ ແລະ ຢືນຢັນຂອງລະບົບ (Custom Modal) ===== */
+    .sys-modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      background: rgba(11, 25, 46, 0.58);
+      backdrop-filter: blur(3px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 18px;
+      animation: modalFadeIn 0.16s ease-out;
+    }
+    .sys-modal-box {
+      width: 100%;
+      max-width: 420px;
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 24px 22px 20px;
+      box-shadow: 0 22px 55px rgba(10, 24, 48, 0.35);
+      border-top: 5px solid var(--blue);
+      text-align: center;
+      animation: modalPopIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sys-modal-box.danger { border-top-color: #c44949; }
+    .sys-modal-box.warning { border-top-color: #d97706; }
+    .sys-modal-icon {
+      width: 54px;
+      height: 54px;
+      margin: 0 auto 12px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #eaf2fc;
+      color: #2463a6;
+    }
+    .sys-modal-box.danger .sys-modal-icon {
+      background: #fdecec;
+      color: #c44949;
+    }
+    .sys-modal-box.warning .sys-modal-icon {
+      background: #fef3c7;
+      color: #d97706;
+    }
+    .sys-modal-title {
+      font-size: 17.5px;
+      font-weight: 700;
+      color: var(--navy);
+      margin: 0 0 8px;
+    }
+    .sys-modal-msg {
+      font-size: 14px;
+      color: #3e5066;
+      line-height: 1.65;
+      white-space: pre-line;
+      margin: 0 0 20px;
+    }
+    .sys-modal-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .sys-modal-actions button {
+      min-width: 115px;
+      padding: 10px 16px;
+      font-size: 13.5px;
+      border-radius: 9px;
+    }
+    .sys-modal-btn-danger {
+      background: #c44949 !important;
+      color: #ffffff !important;
+    }
+    .sys-modal-btn-warning {
+      background: #d97706 !important;
+      color: #ffffff !important;
+    }
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes modalPopIn {
+      from { opacity: 0; transform: scale(0.92) translateY(8px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
   </style>
 </head>
 <body>
@@ -609,6 +697,19 @@
       <div class="dev-credit-ver">
         <span class="ver-badge">Version v1.0.0</span>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ປ໋ອບອັບແຈ້ງເຕືອນ ແລະ ຢືນຢັນຂອງລະບົບ ==================== -->
+<div id="sysModal" class="sys-modal-backdrop hidden" role="dialog" aria-modal="true">
+  <div id="sysModalBox" class="sys-modal-box">
+    <div id="sysModalIcon" class="sys-modal-icon"></div>
+    <h3 id="sysModalTitle" class="sys-modal-title"></h3>
+    <div id="sysModalMsg" class="sys-modal-msg"></div>
+    <div id="sysModalActions" class="sys-modal-actions">
+      <button type="button" id="sysModalCancel" class="secondary">ຍົກເລີກ</button>
+      <button type="button" id="sysModalOk">ຢືນຢັນ</button>
     </div>
   </div>
 </div>
@@ -969,6 +1070,63 @@
     $(id).className = 'status ' + type;
   }
 
+  function openSysDialog({ title = 'ແຈ້ງເຕືອນ', message = '', confirmText = 'ຢືນຢັນ', cancelText = 'ຍົກເລີກ', type = 'question', showCancel = true }) {
+    return new Promise(resolve => {
+      const backdrop = $('sysModal');
+      const box = $('sysModalBox');
+      const iconEl = $('sysModalIcon');
+      const okBtn = $('sysModalOk');
+      const cancelBtn = $('sysModalCancel');
+
+      const icons = {
+        danger: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path></svg>',
+        warning: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>',
+        question: '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>'
+      };
+
+      box.className = 'sys-modal-box ' + (type === 'danger' || type === 'warning' ? type : '');
+      iconEl.innerHTML = icons[type] || icons.question;
+      $('sysModalTitle').textContent = title;
+      $('sysModalMsg').textContent = message;
+
+      okBtn.textContent = confirmText;
+      okBtn.className = type === 'danger' ? 'sys-modal-btn-danger' : (type === 'warning' ? 'sys-modal-btn-warning' : '');
+      cancelBtn.textContent = cancelText;
+      cancelBtn.classList.toggle('hidden', !showCancel);
+
+      backdrop.classList.remove('hidden');
+      okBtn.focus();
+
+      const cleanup = result => {
+        backdrop.classList.add('hidden');
+        document.removeEventListener('keydown', onKey);
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        backdrop.onclick = null;
+        resolve(result);
+      };
+
+      const onKey = e => {
+        if (e.key === 'Escape') cleanup(false);
+      };
+
+      document.addEventListener('keydown', onKey);
+      okBtn.onclick = () => cleanup(true);
+      cancelBtn.onclick = () => cleanup(false);
+      backdrop.onclick = e => {
+        if (e.target === backdrop) cleanup(false);
+      };
+    });
+  }
+
+  function sysConfirm(opts) {
+    return openSysDialog({ showCancel: true, ...opts });
+  }
+
+  function sysAlert(opts) {
+    return openSysDialog({ showCancel: false, confirmText: 'ຕົກລົງ', type: 'warning', ...opts });
+  }
+
   function toggleWeekInput() {
     const isMonthly = $('reportType').value === 'monthly';
     $('weekNoGroup').classList.toggle('hidden', isMonthly);
@@ -1004,6 +1162,7 @@
       .replace(/([\u0EB1\u0EB4-\u0EBC\u0EC8-\u0ECD])\1+/g, '$1') // ແກ້ໄຂສະຫຼະ ຫຼື ວັນນະຍຸດລາວທີ່ຊ້ອນກັນ (ເຊັ່ນ ໄດຸຸຸ້ -> ໄດ້)
       .replace(/^\s*#{1,6}\s*/gm, '')                          // ລຶບ ### ຫຼື #### ໜ້າຫົວຂໍ້
       .replace(/^\s*[-*_]{3,}\s*$/gm, '')                      // ລຶບເສັ້ນຂີດ --- ຫຼື ***
+      .replace(/^\s*[-•*]?\s*ບົດສະຫຼຸບ(?:ປະຈຳ)?(?:ເດືອນ|ອາທິດ|\s*\d+\/\d+)[^\n]*$/gm, '') // ລຶບຫົວຂໍ້ຂັ້ນລະຫວ່າງເດືອນ/ອາທິດ
       .replace(/\*\*(.*?)\*\*/g, '$1')                         // ລຶບ **...** ອອກໃຫ້ເຫຼືອແຕ່ຂໍ້ຄວາມ
       .replace(/__(.*?)__/g, '$1')                             // ລຶບ __...__ ອອກ
       .replace(/\*\*/g, '')                                    // ລຶບ ** ທີ່ອາດເຫຼືອຄ້າງ
@@ -1124,7 +1283,13 @@
 
     let targetId = 'sum' + Date.now() + Math.random().toString(16).slice(2, 6);
     if (editingSummaryId) {
-      const overwrite = confirm('ທ່ານກຳລັງເປີດແກ້ໄຂບົດສະຫຼຸບເກົ່າ.\n- ກົດ OK ເພື່ອ "ບັນທຶກທັບ" ສະບັບເດີມ\n- ກົດ Cancel ເພື່ອ "ບັນທຶກເປັນສະບັບໃໝ່"');
+      const overwrite = await sysConfirm({
+        title: 'ບັນທຶກບົດສະຫຼຸບທີ່ແກ້ໄຂ',
+        message: 'ທ່ານກຳລັງເປີດແກ້ໄຂບົດສະຫຼຸບສະບັບເກົ່າ ຕ້ອງການບັນທຶກໃນຮູບແບບໃດ?',
+        confirmText: 'ບັນທຶກທັບສະບັບເດີມ',
+        cancelText: 'ບັນທຶກເປັນສະບັບໃໝ່',
+        type: 'question'
+      });
       if (overwrite) targetId = editingSummaryId;
     }
 
@@ -1182,7 +1347,15 @@
   };
 
   window.deleteSavedSummary = async function (id) {
-    if (!confirm('ຢືນຢັນລຶບບົດສະຫຼຸບສະບັບນີ້ອອກຈາກລະບົບ?')) return;
+    const ok = await sysConfirm({
+      title: 'ຢືນຢັນການລຶບບົດສະຫຼຸບ',
+      message: 'ຢືນຢັນລຶບບົດສະຫຼຸບສະບັບນີ້ອອກຈາກລະບົບ?\n(ເມື່ອລຶບແລ້ວຈະບໍ່ສາມາດກູ້ຄືນໄດ້)',
+      confirmText: 'ລຶບບົດສະຫຼຸບ',
+      cancelText: 'ຍົກເລີກ',
+      type: 'danger'
+    });
+    if (!ok) return;
+
     try {
       await reportsCol.doc(id).delete();
       if (editingSummaryId === id) editingSummaryId = null;
@@ -1201,10 +1374,10 @@
     const text = $('weekText').value.trim();
 
     if (!department) {
-      return alert('ກະລຸນາເລືອກ ຂະແໜງການ / ສູນ / ຫ້ອງການ');
+      return sysAlert({ title: 'ຂໍ້ມູນບໍ່ຄົບຖ້ວນ', message: 'ກະລຸນາເລືອກ ຂະແໜງການ / ສູນ / ຫ້ອງການ' });
     }
     if (!year || (reportType === 'weekly' && !week) || !text) {
-      return alert('ກະລຸນາປ້ອນປີ, ອາທິດ ແລະ ເນື້ອໃນລາຍງານໃຫ້ຄົບຖ້ວນ');
+      return sysAlert({ title: 'ຂໍ້ມູນບໍ່ຄົບຖ້ວນ', message: 'ກະລຸນາປ້ອນປີ, ອາທິດ ແລະ ເນື້ອໃນລາຍງານໃຫ້ຄົບຖ້ວນ' });
     }
 
     // ກວດສອບບົດລາຍງານຊ້ຳຊ້ອນ (ປີ, ເດືອນ, ພາກສ່ວນ, ປະເພດ ແລະ ອາທິດ ດຽວກັນ)
@@ -1222,16 +1395,18 @@
 
     if (duplicate) {
       const periodLabel = reportType === 'monthly' ? 'ປະຈຳເດືອນ' : `ອາທິດທີ ${week}`;
-      const ok = confirm(
-        `ພົບຂໍ້ມູນຊ້ຳຊ້ອນ!\n` +
-        `ພາກສ່ວນ: ${department}\n` +
-        `ໄລຍະ: ${periodLabel} ເດືອນ ${MONTHS[month - 1]} ${year}\n\n` +
-        `ຕ້ອງການ "ບັນທຶກທັບ" ຂໍ້ມູນເກົ່າທີ່ມີຢູ່ແລ້ວບໍ?`
-      );
+      const ok = await sysConfirm({
+        title: 'ພົບຂໍ້ມູນຊ້ຳຊ້ອນ!',
+        message: `ພາກສ່ວນ: ${department}\nໄລຍະ: ${periodLabel} ເດືອນ ${MONTHS[month - 1]} ${year}\n\nຕ້ອງການ "ບັນທຶກທັບ" ຂໍ້ມູນເກົ່າທີ່ມີຢູ່ແລ້ວບໍ?`,
+        confirmText: 'ບັນທຶກທັບຂໍ້ມູນເກົ່າ',
+        cancelText: 'ຍົກເລີກ',
+        type: 'warning'
+      });
       if (!ok) return;
     }
 
     const targetId = editingId || (duplicate ? duplicate.id : ('w' + Date.now() + Math.random().toString(16).slice(2)));
+    const existingRec = records.find(x => x.id === targetId);
 
     const row = {
       id: targetId,
@@ -1242,6 +1417,8 @@
       title: $('weekTitle').value.trim(),
       department,
       text,
+      isSummarized: existingRec ? Boolean(existingRec.isSummarized) : false,
+      summarizedAt: existingRec?.summarizedAt || '',
       updated: new Date().toISOString()
     };
 
@@ -1288,9 +1465,16 @@
   window.deleteRecord = async function (id) {
     const target = records.find(x => x.id === id);
     if (currentUser?.role === 'dept' && target && (target.department || '').trim() !== currentUser.department) {
-      return alert('ທ່ານມີສິດລຶບສະເພາະບົດລາຍງານຂອງພາກສ່ວນຕົນເອງເທົ່ານັ້ນ');
+      return sysAlert({ title: 'ບໍ່ມີສິດເຂົ້າເຖິງ', message: 'ທ່ານມີສິດລຶບສະເພາະບົດລາຍງານຂອງພາກສ່ວນຕົນເອງເທົ່ານັ້ນ' });
     }
-    if (!confirm('ຢືນຢັນລຶບລາຍງານອາທິດນີ້ອອກຈາກ Firebase?')) return;
+    const ok = await sysConfirm({
+      title: 'ຢືນຢັນການລຶບລາຍງານ',
+      message: 'ຢືນຢັນລຶບບົດລາຍງານສະບັບນີ້ອອກຈາກລະບົບ Firebase?',
+      confirmText: 'ລຶບລາຍງານ',
+      cancelText: 'ຍົກເລີກ',
+      type: 'danger'
+    });
+    if (!ok) return;
 
     setStatus('dbStatus', 'ກຳລັງລຶບຂໍ້ມູນ...');
     try {
@@ -1414,13 +1598,16 @@
       $('weekList').innerHTML = list.map(r => {
         const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
         const periodTag = isMonthly ? 'ປະຈຳເດືອນ' : `ອາທິດ ${esc(r.week)}`;
+        const statusBadge = r.isSummarized
+          ? `<span style="display:inline-block; background:#e8f7f0; color:#136c4b; border:1px solid #b7e4cf; padding:1px 6px; border-radius:4px; font-size:10.5px; font-weight:700; margin-left:4px;">✓ ສັງລວມແລ້ວ</span>`
+          : `<span style="display:inline-block; background:#fff7e6; color:#9a5b00; border:1px solid #f5d699; padding:1px 6px; border-radius:4px; font-size:10.5px; font-weight:700; margin-left:4px;">● ລໍຖ້າສັງລວມ</span>`;
         return `
-          <div class="weekitem">
-            <strong>[${periodTag}] ${r.department ? esc(r.department) : 'ບໍ່ລະບຸພາກສ່ວນ'}</strong>
+          <div class="weekitem" style="${r.isSummarized ? 'background:#f8fbf9;' : ''}">
+            <strong>[${periodTag}] ${r.department ? esc(r.department) : 'ບໍ່ລະບຸພາກສ່ວນ'} ${statusBadge}</strong>
             ${r.title ? `<div style="color:#2463a6; font-weight:600">${esc(r.title)}</div>` : ''}
             <span>${esc(r.text.slice(0, 90))}${r.text.length > 90 ? '…' : ''}</span>
             <br>
-            <button class="secondary" onclick="editRecord('${r.id}')">ແກ້ໄຂ</button>
+            <button class="secondary" onclick="editRecord('${r.id}')">ເບິ່ງ / ແກ້ໄຂ</button>
             <button class="danger" onclick="deleteRecord('${r.id}')">ລຶບ</button>
           </div>
         `;
@@ -1452,18 +1639,40 @@
       .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week || 0) - Number(b.week || 0));
   }
 
+  function getUnsummarizedRecords() {
+    return getSelectedRecords().filter(r => !r.isSummarized);
+  }
+
+  async function markRecordsAsSummarized(rs) {
+    if (!rs || !rs.length) return;
+    const nowIso = new Date().toISOString();
+    for (let i = 0; i < rs.length; i += 450) {
+      const batch = db.batch();
+      rs.slice(i, i + 450).forEach(r => {
+        batch.update(reportsCol.doc(r.id), {
+          isSummarized: true,
+          summarizedAt: nowIso
+        });
+      });
+      await batch.commit();
+    }
+  }
+
   function updateStats() {
     if (!$('stats')) return;
     const { n } = getSelectedRange();
-    const rs = getSelectedRecords();
-    const submittedDepts = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean)).size;
-    const totalChars = rs.reduce((sum, r) => sum + r.text.length, 0).toLocaleString();
+    const allRs = getSelectedRecords();
+    const newRs = allRs.filter(r => !r.isSummarized);
+    const doneCount = allRs.length - newRs.length;
+    const submittedDepts = new Set(allRs.map(r => (r.department || '').trim()).filter(Boolean)).size;
+    const newChars = newRs.reduce((sum, r) => sum + r.text.length, 0).toLocaleString();
 
     $('stats').innerHTML = `
       <div class="stat"><b>${submittedDepts}/${DEPARTMENTS.length}</b> ພາກສ່ວນທີ່ມີບົດ</div>
-      <div class="stat"><b>${rs.length}</b> ບົດລາຍງານ</div>
+      <div class="stat"><b>${newRs.length}</b> ບົດໃໝ່ (ລໍຖ້າສັງລວມ)</div>
+      <div class="stat"><b>${doneCount}</b> ບົດສັງລວມແລ້ວ</div>
       <div class="stat"><b>${n}</b> ເດືອນ</div>
-      <div class="stat"><b>${totalChars}</b> ຕົວອັກສອນ</div>
+      <div class="stat"><b>${newChars}</b> ຕົວອັກສອນໃໝ່</div>
     `;
   }
 
@@ -1628,7 +1837,7 @@
         }
 
         const norm = line.replace(/^[-•*0-9.]+\s*/, '').trim();
-        if (norm.length < 4) return;
+        if (norm.length < 4 || /^ບົດສະຫຼຸບ/i.test(norm)) return;
         if (accepted.some(prev => isSimilarLao(prev, norm))) return;
         accepted.push(norm);
 
@@ -2000,9 +2209,13 @@
   };
 
   $('generate').onclick = async () => {
-    const rs = getSelectedRecords();
+    const allInRange = getSelectedRecords();
+    const rs = getUnsummarizedRecords();
     if (!rs.length) {
-      return setStatus('genStatus', 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.', 'err');
+      const msg = allInRange.length
+        ? 'ຂໍ້ມູນທັງໝົດໃນໄລຍະທີ່ເລືອກໄດ້ສັງລວມໄປແລ້ວ (ບໍ່ມີຂໍ້ມູນໃໝ່). ຫາກຕ້ອງການສັງລວມບົດເກົ່າຄືນ ໃຫ້ລຶບບົດນັ້ນອອກກ່ອນ ແລ້ວປ້ອນເຂົ້າໄປໃໝ່.'
+        : 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
+      return setStatus('genStatus', msg, 'err');
     }
 
     $('generate').disabled = true;
@@ -2060,11 +2273,13 @@
         ? (currentSummaryBundle.byDept[activeViewScope] || '')
         : currentSummaryBundle.overall;
 
+      await markRecordsAsSummarized(rs);
+
       const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
       setStatus(
         'genStatus',
         (cfg.key || cfg.groqBackupKey)
-          ? `ສັງເຄາະດ້ວຍ AI (${activeModel}) ສຳເລັດທັງບົດລວມ ແລະ ${activeDepts.length} ພາກສ່ວນ ໃນ ${totalSec} ວິນາທີ.`
+          ? `ສັງເຄາະດ້ວຍ AI (${activeModel}) ສຳເລັດ ${rs.length} ບົດໃໝ່ (${activeDepts.length} ພາກສ່ວນ) ໃນ ${totalSec} ວິນາທີ ແລະ ລັອກບົດເກົ່າຮຽບຮ້ອຍ.`
           : `ສ້າງບົດລວມ ແລະ ບົດຍ່ອຍ ${activeDepts.length} ພາກສ່ວນສຳເລັດແລ້ວ (ໂໝດພື້ນຖານ).`,
         'ok'
       );
@@ -2083,9 +2298,11 @@
         ? (currentSummaryBundle.byDept[activeViewScope] || '')
         : currentSummaryBundle.overall;
 
+      await markRecordsAsSummarized(rs);
+
       setStatus(
         'genStatus',
-        `ເຊີບເວີ AI ບໍ່ວ່າງ — ລະບົບຈຶ່ງສັງລວມທັງບົດລວມ ແລະ ບົດຍ່ອຍ ${activeDepts.length} ພາກສ່ວນໃຫ້ອັດຕະໂນມັດແລ້ວ.`,
+        `ເຊີບເວີ AI ບໍ່ວ່າງ — ລະບົບຈຶ່ງສັງລວມ ${rs.length} ບົດໃໝ່ (${activeDepts.length} ພາກສ່ວນ) ໃຫ້ອັດຕະໂນມັດແລ້ວ.`,
         'ok'
       );
     } finally {
@@ -2094,10 +2311,14 @@
     }
   };
 
-  $('smartInstant').onclick = () => {
-    const rs = getSelectedRecords();
+  $('smartInstant').onclick = async () => {
+    const allInRange = getSelectedRecords();
+    const rs = getUnsummarizedRecords();
     if (!rs.length) {
-      return setStatus('genStatus', 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.', 'err');
+      const msg = allInRange.length
+        ? 'ຂໍ້ມູນທັງໝົດໃນໄລຍະທີ່ເລືອກໄດ້ສັງລວມໄປແລ້ວ (ບໍ່ມີຂໍ້ມູນໃໝ່). ຫາກຕ້ອງການສັງລວມບົດເກົ່າຄືນ ໃຫ້ລຶບບົດນັ້ນອອກກ່ອນ ແລ້ວປ້ອນເຂົ້າໄປໃໝ່.'
+        : 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
+      return setStatus('genStatus', msg, 'err');
     }
     currentSummaryBundle = buildAllOfflineSummaries(rs);
     refreshViewScopeSelect();
@@ -2105,14 +2326,20 @@
       ? (currentSummaryBundle.byDept[activeViewScope] || '')
       : currentSummaryBundle.overall;
 
+    await markRecordsAsSummarized(rs);
+
     const deptCount = Object.keys(currentSummaryBundle.byDept).length;
-    setStatus('genStatus', `ສັງລວມທັງບົດລວມພະແນກ ແລະ ບົດຍ່ອຍ ${deptCount} ພາກສ່ວນສຳເລັດທັນທີ (ເລືອກສະຫຼັບເບິ່ງໄດ້ດ້ານລຸ່ມ).`, 'ok');
+    setStatus('genStatus', `ສັງລວມ ${rs.length} ບົດໃໝ່ (${deptCount} ພາກສ່ວນ) ສຳເລັດທັນທີ ແລະ ລັອກຂໍ້ມູນເກົ່າໄວ້ກວດກາຄືນຫຼັງແລ້ວ.`, 'ok');
   };
 
   $('copyForWebAI').onclick = async () => {
-    const rs = getSelectedRecords();
+    const allInRange = getSelectedRecords();
+    const rs = getUnsummarizedRecords();
     if (!rs.length) {
-      return setStatus('genStatus', 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.', 'err');
+      const msg = allInRange.length
+        ? 'ຂໍ້ມູນທັງໝົດໃນໄລຍະທີ່ເລືອກໄດ້ສັງລວມໄປແລ້ວ (ບໍ່ມີຂໍ້ມູນໃໝ່).'
+        : 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
+      return setStatus('genStatus', msg, 'err');
     }
     const promptText = buildPrompt(rs);
     try {
@@ -2177,10 +2404,10 @@
     const rawDocDate = ($('docDateText')?.value || '').trim();
     const docDateDisplay = rawDocDate || `....../....../${y}`;
 
-    const lines = content.split(/\n+/).map(l => l.trim()).filter(Boolean);
-    if (lines.length && /^ບົດສະຫຼຸບ/.test(lines[0])) {
-      lines.shift();
-    }
+    const lines = content
+      .split(/\n+/)
+      .map(l => l.trim())
+      .filter(l => l && !/^[-•*]?\s*ບົດສະຫຼຸບ/.test(l));
 
     const fontBase = 'font-family:"Phetsarath OT","Saysettha OT",Arial,sans-serif;';
     const paragraphs = lines.map(line => {
@@ -2296,10 +2523,10 @@
     const rawDocDate = ($('docDateText')?.value || '').trim();
     const docDateDisplay = rawDocDate || `....../....../${y}`;
 
-    const lines = content.split(/\n+/).map(l => l.trim()).filter(Boolean);
-    if (lines.length && /^ບົດສະຫຼຸບ/.test(lines[0])) {
-      lines.shift();
-    }
+    const lines = content
+      .split(/\n+/)
+      .map(l => l.trim())
+      .filter(l => l && !/^[-•*]?\s*ບົດສະຫຼຸບ/.test(l));
 
     const paragraphs = lines.map(line => {
       const isMajorPart = /^ພາກທີ\s+[I|V|X|1-3]/i.test(line);
