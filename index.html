@@ -31,36 +31,266 @@
       line-height: 1.65;
     }
 
+    /* ===== ໜ້າຈໍເຂົ້າສູ່ລະບົບ (Login Screen) ===== */
+    .login-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: radial-gradient(circle at top right, #2c6cb0 0%, #163356 48%, #0d1f36 100%);
+    }
+    .login-card {
+      width: 100%;
+      max-width: 450px;
+      background: #ffffff;
+      border-radius: 18px;
+      padding: 30px 28px 24px;
+      box-shadow: 0 20px 50px rgba(7, 19, 36, 0.42);
+      border-top: 5px solid #2463a6;
+      position: relative;
+    }
+    .login-emblem {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 12px;
+      border-radius: 15px;
+      background: linear-gradient(135deg, #142b4a, #286cb5);
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 8px 18px rgba(36, 99, 166, 0.28);
+    }
+    .login-card h2 {
+      text-align: center;
+      font-size: 20.5px;
+      margin: 0 0 4px;
+      color: var(--navy);
+    }
+    .login-sub {
+      text-align: center;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 18px;
+      padding-bottom: 14px;
+      border-bottom: 1px dashed #dce4ee;
+    }
+    .login-btn-main {
+      width: 100%;
+      padding: 12px;
+      font-size: 14.5px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, #1b4b82 0%, #266bb5 100%);
+      box-shadow: 0 6px 16px rgba(36, 99, 166, 0.28);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .login-btn-main:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(36, 99, 166, 0.36);
+    }
+
+    /* ===== ກ່ອງຂໍ້ມູນຜູ້ພັດທະນາ & ເວີຊັນ ===== */
+    .dev-credit {
+      margin-top: 18px;
+      padding: 14px 16px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #f5f9ff 0%, #eaf2fc 100%);
+      border: 1px solid #d4e2f4;
+      text-align: center;
+      position: relative;
+    }
+    .dev-credit-label {
+      font-size: 11.5px;
+      color: #5b6f87;
+      margin-bottom: 2px;
+    }
+    .dev-credit-name {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--navy);
+      letter-spacing: 0.2px;
+    }
+    .dev-credit-tel {
+      margin-top: 5px;
+      font-size: 12.5px;
+      color: #26486e;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      background: #ffffff;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid #dce7f5;
+    }
+    .dev-credit-ver {
+      margin-top: 8px;
+    }
+    .ver-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      color: #1f5694;
+      background: #dce9fa;
+      padding: 2px 10px;
+      border-radius: 999px;
+      letter-spacing: 0.4px;
+    }
+
     /* ===== ສ່ວນຫົວ (Header) ===== */
     header {
+      position: sticky;
+      top: 0;
+      z-index: 1000;
       background: linear-gradient(120deg, #122943, #245b91);
       color: #fff;
-      padding: 22px max(18px, calc((100% - 1250px) / 2));
-      box-shadow: 0 3px 15px #132b4822;
+      padding: 16px max(18px, calc((100% - 1250px) / 2));
+      box-shadow: 0 4px 18px rgba(19, 43, 72, 0.22);
+    }
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
     }
     header h1 { font-size: 23px; margin: 0 0 3px; }
     header p { margin: 0; color: #d9e8f7; font-size: 13px; }
+    .user-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.13);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      padding: 7px 12px;
+      border-radius: 10px;
+      font-size: 12.5px;
+    }
+    .user-bar button {
+      background: #fff;
+      color: var(--navy);
+      padding: 5px 10px;
+      font-size: 12px;
+    }
 
-    /* ===== ໂຄງສ້າງຫຼັກ (Layout) ===== */
+    /* ===== ໂຄງສ້າງຫຼັກ (Layout ແຍກ Scrollbar ຊ້າຍ-ຂວາ) ===== */
     .shell {
-      max-width: 1250px;
-      margin: 22px auto;
-      padding: 0 16px;
+      width: 100%;
+      max-width: 100%;
+      margin: 0;
+      padding: 0;
+      height: calc(100vh - 82px);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
     }
     .layout {
+      flex: 1;
+      min-height: 0;
       display: grid;
-      grid-template-columns: 285px 1fr;
-      gap: 18px;
-      align-items: start;
+      grid-template-columns: 325px 1fr;
+      gap: 0;
+      align-items: stretch;
     }
-    .panel, .card {
-      background: #fff;
-      border: 1px solid var(--line);
+    .card {
       border-radius: 13px;
       box-shadow: 0 4px 16px #203c5c09;
     }
-    .panel { padding: 16px; position: sticky; top: 12px; }
-    .card { padding: 20px; margin-bottom: 16px; }
+    /* ສ່ວນຊ້າຍ: ສີຟ້າເຂັ້ມ Royal Blue ເຕັມຂອບຊ້າຍ-ລຸ່ມ + Scrollbar ຂອງຕົນເອງ */
+    .panel {
+      background: linear-gradient(180deg, #123285 0%, #173fa3 55%, #112d78 100%);
+      border: 0;
+      border-right: 1px solid #0f296e;
+      border-radius: 0;
+      color: #ffffff;
+      padding: 18px 18px 24px;
+      height: 100%;
+      overflow-y: auto;
+      box-shadow: 3px 0 18px rgba(15, 35, 85, 0.16);
+    }
+    .panel h2, .panel h3 {
+      color: #ffffff;
+    }
+    .panel label {
+      color: #e6efff;
+    }
+    .panel input, .panel select, .panel textarea {
+      background: #ffffff;
+      color: #1c2938;
+      border: 1px solid rgba(255, 255, 255, 0.35);
+    }
+    .panel #saveWeek {
+      background: #2563eb;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    }
+    .panel #clearForm, .panel #refreshDb {
+      background: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .panel #clearForm:hover, .panel #refreshDb:hover {
+      background: rgba(255, 255, 255, 0.26);
+    }
+    .panel .status {
+      color: #dbeafe;
+    }
+    .panel .status.ok {
+      color: #86efac;
+      font-weight: 600;
+    }
+    .panel .status.err {
+      color: #fca5a5;
+      font-weight: 600;
+    }
+    .panel .small {
+      color: #dbeafe;
+    }
+    .panel .weekitem {
+      background: #ffffff;
+      color: var(--ink);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    .panel .dept-tracker {
+      background: #ffffff;
+      color: var(--ink);
+      border-color: rgba(255, 255, 255, 0.25);
+    }
+    /* ສ່ວນຂວາ: Scrollbar ຂອງຕົນເອງ ພ້ອມ Footer ຢູ່ທ້າຍສຸດ */
+    main {
+      height: 100%;
+      overflow-y: auto;
+      padding: 18px 22px 20px;
+      display: flex;
+      flex-direction: column;
+    }
+    /* ປັບແຕ່ງແຖບ Scrollbar ໃຫ້ສວຍງາມ */
+    .panel::-webkit-scrollbar, main::-webkit-scrollbar {
+      width: 7px;
+    }
+    .panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.32);
+      border-radius: 999px;
+    }
+    .panel::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+    main::-webkit-scrollbar-thumb {
+      background: #c7d4e5;
+      border-radius: 999px;
+    }
+    .panel::-webkit-scrollbar-track, main::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .card {
+      background: #fff;
+      border: 1px solid var(--line);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
     /* ===== ຕົວໜັງສື ແລະ ຟອມ ===== */
@@ -229,16 +459,63 @@
     .hidden { display: none !important; }
 
     .footer {
-      text-align: center;
-      color: #8794a5;
-      font-size: 11px;
-      padding: 18px;
+      margin-top: auto;
+      flex-shrink: 0;
+      padding: 12px 18px;
+      background: linear-gradient(135deg, #ffffff 0%, #f1f6fc 100%);
+      border: 1px solid #d5e1f0;
+      border-top: 3px solid var(--blue);
+      border-radius: 13px;
+      box-shadow: 0 4px 16px rgba(20, 43, 74, 0.05);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px 10px;
+      font-size: 12.5px;
+      color: #44566c;
+    }
+    .footer-title {
+      font-weight: 700;
+      color: var(--navy);
+    }
+    .footer-sep {
+      color: #b4c4d8;
+    }
+    .footer-dev b {
+      color: var(--blue);
+      font-weight: 700;
+    }
+    .footer-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #ffffff;
+      border: 1px solid #d7e3f2;
+      color: #1e3f66;
+      padding: 3px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 600;
+      box-shadow: 0 1px 3px rgba(20, 43, 74, 0.04);
+    }
+    .footer-ver {
+      display: inline-block;
+      background: #dce9fa;
+      color: #1b4f8c;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 11.5px;
+      font-weight: 700;
+      letter-spacing: 0.3px;
     }
 
     /* ===== ຮອງຮັບໜ້າຈໍມືຖື ===== */
     @media (max-width: 850px) {
-      .layout { grid-template-columns: 1fr; }
-      .panel { position: static; }
+      .shell { height: auto; overflow: visible; display: block; }
+      .layout { display: grid; grid-template-columns: 1fr; height: auto; }
+      .panel, main { height: auto; overflow-y: visible; padding-right: 0; }
+      .footer { margin-top: 16px; }
       .weeklist { max-height: 250px; }
       .two { grid-template-columns: 1fr; }
     }
@@ -246,8 +523,9 @@
     /* ===== ຮູບແບບຕອນສັ່ງພິມ (Print / PDF) ===== */
     @media print {
       header, .panel, .tabs, .no-print, .footer { display: none !important; }
-      .shell { max-width: none; margin: 0; padding: 0; }
-      .layout { display: block; }
+      .shell { max-width: none; height: auto !important; overflow: visible !important; display: block !important; margin: 0; padding: 0; }
+      .layout { display: block; height: auto !important; }
+      main { height: auto !important; overflow: visible !important; }
       .card { border: 0; box-shadow: none; padding: 0; }
       #result { border: 0; padding: 0; }
     }
@@ -255,12 +533,59 @@
 </head>
 <body>
 
-<header>
-  <h1>ລະບົບສັງລວມບົດລາຍງານຜົນການປະຕິບັດວຽກ</h1>
-  <p>Weekly → Monthly → 3 / 6 / 9 / 12 Months | ບັນທຶກຂໍ້ມູນອອນລາຍຜ່ານ Firebase</p>
+<!-- ==================== ໜ້າຈໍເຂົ້າສູ່ລະບົບ ==================== -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-emblem" aria-hidden="true">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+    </div>
+    <h2>ເຂົ້າສູ່ລະບົບສັງລວມບົດລາຍງານ</h2>
+    <div class="login-sub">ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງໄຊຍະບູລີ</div>
+
+    <label>ເລືອກພາກສ່ວນ / ບັນຊີຜູ້ໃຊ້</label>
+    <select id="loginAccount"></select>
+
+    <label>ລະຫັດຜ່ານ</label>
+    <input id="loginPassword" type="password" placeholder="ປ້ອນລະຫັດຜ່ານ...">
+
+    <div class="actions" style="margin-top:18px">
+      <button id="loginBtn" class="login-btn-main">ເຂົ້າສູ່ລະບົບ</button>
+    </div>
+    <div id="loginStatus" class="status" style="text-align:center"></div>
+
+    <div class="dev-credit">
+      <div class="dev-credit-label">ຂຽນ ແລະ ພັດທະນາລະບົບໂດຍ</div>
+      <div class="dev-credit-name">ອາຈານ ບຸນແຕ່ງ ຊົ່ງຕົງມົວ</div>
+      <div>
+        <span class="dev-credit-tel">📞 02059456999, 02099444448</span>
+      </div>
+      <div class="dev-credit-ver">
+        <span class="ver-badge">Version v1.0.0</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<header id="appHeader" class="hidden">
+  <div class="header-inner">
+    <div>
+      <h1>ລະບົບສັງລວມບົດລາຍງານຜົນການປະຕິບັດວຽກ</h1>
+      <p>Weekly → Monthly → 3 / 6 / 9 / 12 Months | ບັນທຶກຂໍ້ມູນອອນລາຍຜ່ານ Firebase</p>
+    </div>
+    <div class="user-bar">
+      <span id="currentUserBadge">ກຳລັງໂຫຼດ...</span>
+      <button type="button" id="logoutBtn">ອອກຈາກລະບົບ</button>
+    </div>
+  </div>
 </header>
 
-<div class="shell">
+<div id="appShell" class="shell hidden">
   <div class="layout">
 
     <!-- ==================== ແຖບດ້ານຊ້າຍ: ປ້ອນຂໍ້ມູນລາຍອາທິດ ==================== -->
@@ -340,8 +665,9 @@
     <main>
       <div class="tabs no-print">
         <button class="tab active" data-tab="summary">ສັງລວມລາຍງານ</button>
-        <button class="tab" data-tab="settings">ຕັ້ງຄ່າ AI</button>
-        <button class="tab" data-tab="backup">ສຳຮອງຂໍ້ມູນ</button>
+        <button class="tab admin-only" data-tab="settings">ຕັ້ງຄ່າ AI</button>
+        <button class="tab admin-only" data-tab="backup">ສຳຮອງຂໍ້ມູນ</button>
+        <button class="tab admin-only" data-tab="users">ຈັດການຜູ້ໃຊ້</button>
       </div>
 
       <!-- ແຖບ 1: ສັງລວມລາຍງານ -->
@@ -416,7 +742,15 @@
               <option value="">ບົດລວມຂອງພະແນກ (ທຸກຂະແໜງການ / ສູນ)</option>
             </select>
           </div>
-          <input id="summaryTitle" class="no-print" placeholder="ຊື່ບົດສະຫຼຸບ (ເຊັ່ນ: ບົດສະຫຼຸບ 3 ເດືອນ ຕຸລາ - ທັນວາ 2026)..." style="margin-bottom:10px">
+          <input id="summaryTitle" class="no-print" placeholder="ຊື່ບົດສະຫຼຸບ (ເຊັ່ນ: ບົດສະຫຼຸບ 3 ເດືອນ ຕຸລາ - ທັນວາ 2026)..." style="margin-bottom:8px">
+          <div class="two no-print" style="margin-bottom:10px">
+            <div>
+              <input id="docNumber" placeholder="ເລກທີເອກະສານ Word (ເຊັ່ນ: 025/ສກຂ.ຊຍ)">
+            </div>
+            <div>
+              <input id="docDateText" placeholder="ວັນທີລົງລາຍເຊັນ (ເຊັ່ນ: 25 ພະຈິກ 2026)">
+            </div>
+          </div>
           <textarea id="result" placeholder="ຜົນການສັງລວມຈະສະແດງຢູ່ບ່ອນນີ້..."></textarea>
           <div class="actions no-print">
             <button id="saveSummary" class="green">ບັນທຶກບົດສະຫຼຸບ</button>
@@ -495,10 +829,28 @@
           <div id="backupStatus" class="status"></div>
         </div>
       </section>
+
+      <!-- ແຖບ 4: ຈັດການຜູ້ໃຊ້ ແລະ ລະຫັດຜ່ານ -->
+      <section id="usersTab" class="hidden">
+        <div class="card">
+          <h2>ຈັດການບັນຊີ ແລະ ລະຫັດຜ່ານແຕ່ລະພາກສ່ວນ</h2>
+          <div class="hint">
+            ການປ່ຽນລະຫັດຜ່ານຢູ່ບ່ອນນີ້ຈະຖືກບັນທຶກລົງ Firebase ທັນທີ ແລະ ມີຜົນກັບທຸກເຄື່ອງທີ່ເຂົ້າໃຊ້ງານ.
+          </div>
+          <div id="userAccountsList" style="display:flex; flex-direction:column; gap:8px"></div>
+          <div id="userMgmtStatus" class="status"></div>
+        </div>
+      </section>
+    <footer class="footer no-print">
+        <span class="footer-title">ລະບົບສັງລວມບົດລາຍງານຜົນການປະຕິບັດວຽກ</span>
+        <span class="footer-sep">|</span>
+        <span class="footer-dev">ຂຽນ ແລະ ພັດທະນາລະບົບໂດຍ: <b>ອາຈານ ບຸນແຕ່ງ ຊົ່ງຕົງມົວ</b></span>
+        <span class="footer-pill">📞 02059456999, 02099444448</span>
+        <span class="footer-ver">Version v1.0.0</span>
+      </footer>
     </main>
 
   </div>
-  <div class="footer">ລະບົບເຊື່ອມຕໍ່ຖານຂໍ້ມູນ Firebase · ຂໍ້ມູນຊິ້ງອອນລາຍທຸກອຸປະກອນ</div>
 </div>
 
 <script>
@@ -548,6 +900,13 @@
     'ຫ້ອງການກຳມາທິການສຶກສາສົງແຂວງ'
   ];
 
+  const AUTH_SESSION_KEY = 'lao_report_session_v1';
+  const ADMIN_ACCOUNT_ID = '__ADMIN__';
+  const DEFAULT_ADMIN_PASS = 'admin1234';
+  const DEFAULT_DEPT_PASS = '123456';
+
+  let currentUser = null;
+  let userAccounts = {};
   let records = [];
   let editingId = null;
   let savedSummaries = [];
@@ -580,6 +939,9 @@
     $('weekNo').value = '1';
     ['weekTitle', 'weekText'].forEach(id => $(id).value = '');
     $('saveWeek').textContent = 'ບັນທຶກລາຍງານ';
+    if (currentUser?.role === 'dept') {
+      $('department').value = currentUser.department;
+    }
   }
 
   function downloadFile(name, data, type) {
@@ -622,10 +984,16 @@
     unsubscribeRealtime = reportsCol.onSnapshot(
       snap => {
         const allDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        records = allDocs.filter(d => d.recordKind !== 'saved_summary');
+        records = allDocs.filter(d => d.recordKind !== 'saved_summary' && d.recordKind !== 'user_account');
         savedSummaries = allDocs
           .filter(d => d.recordKind === 'saved_summary')
           .sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')));
+
+        const nextAccounts = {};
+        allDocs.filter(d => d.recordKind === 'user_account').forEach(acc => {
+          nextAccounts[acc.accountKey] = acc;
+        });
+        userAccounts = nextAccounts;
 
         // ຖ້າລາຍການທີ່ກຳລັງເປີດແກ້ໄຂຖືກລຶບຈາກເຄື່ອງອື່ນ ໃຫ້ລ້າງຟອມອັດຕະໂນມັດ
         if (editingId && !records.some(r => r.id === editingId)) {
@@ -637,6 +1005,7 @@
 
         renderWeekList();
         renderSavedSummaries();
+        renderUserAccounts();
 
         const timeNow = new Date().toLocaleTimeString('lo-LA');
         const hasRemoteUpdate = !isFirstSnapshot && !snap.metadata.hasPendingWrites && snap.docChanges().length > 0;
@@ -662,6 +1031,7 @@
     if (!box) return;
     const kw = ($('searchSavedSummary')?.value || '').trim().toLowerCase();
     const list = savedSummaries.filter(s => {
+      if (currentUser?.role === 'dept' && s.department !== currentUser.department) return false;
       if (!kw) return true;
       return `${s.title || ''} ${s.periodLabel || ''} ${s.text || ''}`.toLowerCase().includes(kw);
     });
@@ -719,10 +1089,13 @@
     const item = {
       id: targetId,
       recordKind: 'saved_summary',
+      department: currentUser?.role === 'dept' ? currentUser.department : '',
       year: y,
       period: n,
       startMonth: start,
-      periodLabel,
+      periodLabel: currentUser?.role === 'dept'
+        ? `[${currentUser.department}] ` + (n === 1 ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ${y}` : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ${y})`)
+        : periodLabel,
       title,
       text: overallText,
       byDept: currentSummaryBundle.byDept || {},
@@ -847,6 +1220,9 @@
   window.editRecord = function (id) {
     const r = records.find(x => x.id === id);
     if (!r) return;
+    if (currentUser?.role === 'dept' && (r.department || '').trim() !== currentUser.department) {
+      return alert('ທ່ານມີສິດແກ້ໄຂສະເພາະບົດລາຍງານຂອງພາກສ່ວນຕົນເອງເທົ່ານັ້ນ');
+    }
 
     editingId = id;
     $('year').value = r.year;
@@ -868,6 +1244,10 @@
   };
 
   window.deleteRecord = async function (id) {
+    const target = records.find(x => x.id === id);
+    if (currentUser?.role === 'dept' && target && (target.department || '').trim() !== currentUser.department) {
+      return alert('ທ່ານມີສິດລຶບສະເພາະບົດລາຍງານຂອງພາກສ່ວນຕົນເອງເທົ່ານັ້ນ');
+    }
     if (!confirm('ຢືນຢັນລຶບລາຍງານອາທິດນີ້ອອກຈາກ Firebase?')) return;
 
     setStatus('dbStatus', 'ກຳລັງລຶບຂໍ້ມູນ...');
@@ -889,18 +1269,22 @@
 
   function initDeptSelect() {
     const allDepts = getAllDepartments();
-    const cur = $('department').value;
+    const isDeptUser = currentUser?.role === 'dept';
+    const cur = isDeptUser ? currentUser.department : $('department').value;
+
     $('department').innerHTML =
       '<option value="">-- ເລືອກຂະແໜງການ / ສູນ / ຫ້ອງການ --</option>' +
       allDepts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
     if (cur) $('department').value = cur;
+    $('department').disabled = isDeptUser;
 
     if ($('filterDept')) {
-      const curFilter = $('filterDept').value;
+      const curFilter = isDeptUser ? currentUser.department : $('filterDept').value;
       $('filterDept').innerHTML =
         '<option value="">-- ສະແດງທຸກພາກສ່ວນ --</option>' +
         allDepts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
       if (curFilter) $('filterDept').value = curFilter;
+      $('filterDept').disabled = isDeptUser;
     }
 
     refreshViewScopeSelect();
@@ -1019,7 +1403,10 @@
   function getSelectedRecords() {
     const { months } = getSelectedRange();
     return records
-      .filter(r => months.some(m => m.year === r.year && m.month === r.month))
+      .filter(r => {
+        if (currentUser?.role === 'dept' && (r.department || '').trim() !== currentUser.department) return false;
+        return months.some(m => m.year === r.year && m.month === r.month);
+      })
       .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week || 0) - Number(b.week || 0));
   }
 
@@ -1734,28 +2121,46 @@
 
     const { y, n, start, months } = getSelectedRange();
     const end = months[months.length - 1];
-    const targetDept = activeViewScope.trim();
+    const targetDept = currentUser?.role === 'dept'
+      ? currentUser.department
+      : activeViewScope.trim();
+
     const periodTitle = n === 1
       ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
       : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
 
+    const rawDocNo = ($('docNumber')?.value || '').trim();
+    const suffixCode = !targetDept ? 'ສກຂ.ຊຍ' : (/^ສູນ/.test(targetDept) ? 'ສນ' : (/^ຫ້ອງການ/.test(targetDept) ? 'ຫກ' : 'ຂໜ'));
+    const docNoDisplay = rawDocNo || `............/${suffixCode}`;
+    const rawDocDate = ($('docDateText')?.value || '').trim();
+    const docDateDisplay = rawDocDate || `....../....../${y}`;
+
     const lines = content.split(/\n+/).map(l => l.trim()).filter(Boolean);
-    // ຕັດຫົວບົດຊ້ຳຖ້າ AI ຂຽນຂຶ້ນຕົ້ນດ້ວຍ "ບົດສະຫຼຸບ..."
     if (lines.length && /^ບົດສະຫຼຸບ/.test(lines[0])) {
       lines.shift();
     }
 
+    const fontBase = 'font-family:"Phetsarath OT","Saysettha OT",Arial,sans-serif;';
     const paragraphs = lines.map(line => {
       const isMajorPart = /^ພາກທີ\s+[I|V|X|1-3]/i.test(line);
-      const isSubHeading = /^([0-9]+\.|[ກ-ຮ]\.|•|-)\s*/.test(line);
+      const isNumberedDept = /^[0-9]+\.\s+/.test(line);
+      const isSubBullet = /^([0-9]+\.[0-9]+|[ກ-ຮ]\.|•|-)\s*/.test(line);
+
       if (isMajorPart) {
-        return `<p style="margin:12pt 0 6pt 0; font-weight:bold; font-size:13pt; line-height:1.5;">${esc(line)}</p>`;
+        return `<p style="${fontBase} margin:14pt 0 6pt 0; font-weight:bold; font-size:13pt; line-height:1.45;">${esc(line)}</p>`;
       }
-      if (isSubHeading) {
-        return `<p style="margin:4pt 0 4pt 0.6cm; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+      if (isNumberedDept) {
+        return `<p style="${fontBase} margin:8pt 0 4pt 0.4cm; font-weight:bold; font-size:12pt; line-height:1.5;">${esc(line)}</p>`;
       }
-      return `<p style="margin:0 0 6pt 0; text-indent:1.25cm; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+      if (isSubBullet) {
+        return `<p style="${fontBase} margin:3pt 0 3pt 0.9cm; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+      }
+      return `<p style="${fontBase} margin:0 0 6pt 0; text-indent:1.25cm; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
     }).join('');
+
+    const signerTitle = !targetDept
+      ? 'ຫົວໜ້າພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ'
+      : (/^ສູນ/.test(targetDept) ? 'ຜູ້ອຳນວຍການ' + targetDept : 'ຫົວໜ້າ' + targetDept);
 
     const docHtml = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office"
@@ -1765,13 +2170,13 @@
         <meta charset="UTF-8">
         <style>
           @page { size: A4; margin: 2cm 2cm 2cm 2.5cm; }
-          body { font-family: "Phetsarath OT", "Saysettha OT", Arial, sans-serif; font-size: 12pt; color: #000; }
+          body, p, div, td, span { font-family: "Phetsarath OT", "Saysettha OT", Arial, sans-serif; font-size: 12pt; color: #000; }
           table.hdr { width: 100%; border-collapse: collapse; margin-bottom: 14pt; }
           table.hdr td { vertical-align: top; padding: 0; font-size: 12pt; line-height: 1.5; }
         </style>
       </head>
       <body>
-        <div style="text-align:center; font-weight:bold; line-height:1.45; margin-bottom:12pt;">
+        <div style="${fontBase} text-align:center; font-weight:bold; line-height:1.45; margin-bottom:12pt;">
           <div>ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ</div>
           <div>ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນະຖາວອນ</div>
           <div style="font-weight:normal; letter-spacing:1pt;">-------===ooo===-------</div>
@@ -1779,19 +2184,19 @@
 
         <table class="hdr">
           <tr>
-            <td style="width:58%;">
+            <td style="${fontBase} width:58%;">
               <div>ກະຊວງສຶກສາທິການ ແລະ ກິລາ</div>
               <div style="${targetDept ? '' : 'font-weight:bold;'}">ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງໄຊຍະບູລີ</div>
               ${targetDept ? `<div style="font-weight:bold;">${esc(targetDept)}</div>` : ''}
             </td>
-            <td style="width:42%; text-align:right;">
-              <div>ເລກທີ ............/${targetDept ? 'ຂໜ' : 'ສກຂ.ຊຍ'}</div>
-              <div>ໄຊຍະບູລີ, ວັນທີ ....../....../${y}</div>
+            <td style="${fontBase} width:42%; text-align:right;">
+              <div>ເລກທີ ${esc(docNoDisplay)}</div>
+              <div>ໄຊຍະບູລີ, ວັນທີ ${esc(docDateDisplay)}</div>
             </td>
           </tr>
         </table>
 
-        <div style="text-align:center; font-weight:bold; margin:10pt 0 14pt 0; line-height:1.45;">
+        <div style="${fontBase} text-align:center; font-weight:bold; margin:10pt 0 14pt 0; line-height:1.45;">
           <div style="font-size:15pt;">ບົດສະຫຼຸບ</div>
           <div style="font-size:13pt;">ການຈັດຕັ້ງປະຕິບັດວຽກງານ${esc(periodTitle)}</div>
           ${targetDept ? `<div style="font-size:12.5pt;">ຂອງ ${esc(targetDept)}</div>` : ''}
@@ -1799,12 +2204,17 @@
 
         ${paragraphs}
 
-        <table style="width:100%; border-collapse:collapse; margin-top:24pt;">
+        <table style="width:100%; border-collapse:collapse; margin-top:26pt; page-break-inside:avoid;">
           <tr>
-            <td style="width:50%;"></td>
-            <td style="width:50%; text-align:center; font-weight:bold; line-height:1.5;">
-              <div>${esc(!targetDept ? 'ຫົວໜ້າພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ' : (/^ສູນ/.test(targetDept) ? 'ຜູ້ອຳນວຍການ' + targetDept : 'ຫົວໜ້າ' + targetDept))}</div>
-              <br><br><br>
+            <td style="${fontBase} width:48%; vertical-align:top; font-size:11pt;">
+              <div style="font-weight:bold; text-decoration:underline;">ບ່ອນສົ່ງ:</div>
+              <div>- ຄະນະພະແນກ (ເພື່ອລາຍງານ)</div>
+              <div>- ບັນດາຂະແໜງການ/ສູນ (ເພື່ອຊາບ)</div>
+              <div>- ເກັບມ້ຽນ</div>
+            </td>
+            <td style="${fontBase} width:52%; text-align:center; font-weight:bold; line-height:1.5; vertical-align:top;">
+              <div>${esc(signerTitle)}</div>
+              <br><br><br><br>
             </td>
           </tr>
         </table>
@@ -1960,28 +2370,159 @@
   };
 
   // ສະຫຼັບແຖບເມນູ (Tabs)
+  function switchTab(tabName) {
+    document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x.dataset.tab === tabName));
+    ['summary', 'settings', 'backup', 'users'].forEach(t => {
+      if ($(t + 'Tab')) $(t + 'Tab').classList.toggle('hidden', t !== tabName);
+    });
+  }
+
   document.querySelectorAll('.tab').forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll('.tab').forEach(x => x.classList.toggle('active', x === btn));
-      ['summary', 'settings', 'backup'].forEach(t => {
-        $(t + 'Tab').classList.toggle('hidden', t !== btn.dataset.tab);
-      });
-    };
+    btn.onclick = () => switchTab(btn.dataset.tab);
   });
 
   // =========================================================
-  // 7. ເລີ່ມຕົ້ນລະບົບ (Initialization)
+  // 7. ລະບົບເຂົ້າສູ່ລະບົບ ແລະ ຈັດການສິດຜູ້ໃຊ້ (Authentication & Roles)
+  // =========================================================
+  function getExpectedPassword(accountKey) {
+    if (userAccounts[accountKey]?.password) return userAccounts[accountKey].password;
+    return accountKey === ADMIN_ACCOUNT_ID ? DEFAULT_ADMIN_PASS : DEFAULT_DEPT_PASS;
+  }
+
+  function initLoginDropdown() {
+    const sel = $('loginAccount');
+    if (!sel) return;
+    sel.innerHTML =
+      `<option value="${ADMIN_ACCOUNT_ID}">★ ຜູ້ດູແລລະບົບ (ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ)</option>` +
+      DEPARTMENTS.map((d, i) => `<option value="${esc(d)}">${i + 1}. ${esc(d)}</option>`).join('');
+  }
+
+  function applyAuthSession(user) {
+    currentUser = user;
+    if (!user) {
+      $('loginScreen').classList.remove('hidden');
+      $('appHeader').classList.add('hidden');
+      $('appShell').classList.add('hidden');
+      $('loginPassword').value = '';
+      return;
+    }
+
+    $('loginScreen').classList.add('hidden');
+    $('appHeader').classList.remove('hidden');
+    $('appShell').classList.remove('hidden');
+
+    const isAdmin = user.role === 'admin';
+    $('currentUserBadge').textContent = isAdmin
+      ? 'ຜູ້ດູແລລະບົບ (ພະແນກ)'
+      : user.department;
+
+    document.querySelectorAll('.admin-only').forEach(el => {
+      el.classList.toggle('hidden', !isAdmin);
+    });
+
+    switchTab('summary');
+    initDeptSelect();
+    renderWeekList();
+    renderSavedSummaries();
+    renderUserAccounts();
+  }
+
+  function renderUserAccounts() {
+    const box = $('userAccountsList');
+    if (!box || currentUser?.role !== 'admin') return;
+
+    const allRows = [
+      { key: ADMIN_ACCOUNT_ID, label: '★ ຜູ້ດູແລລະບົບ (ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ)' },
+      ...DEPARTMENTS.map((d, i) => ({ key: d, label: `${i + 1}. ${d}` }))
+    ];
+
+    box.innerHTML = allRows.map((row, idx) => {
+      const currentPass = getExpectedPassword(row.key);
+      return `
+        <div class="weekitem" style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap">
+          <div style="flex:1; min-width:220px">
+            <strong style="font-size:13px">${esc(row.label)}</strong>
+            <span class="small">ລະຫັດຜ່ານປັດຈຸບັນ: <code>${esc(currentPass)}</code></span>
+          </div>
+          <div style="display:flex; gap:6px; align-items:center">
+            <input id="passInput_${idx}" type="text" value="${esc(currentPass)}" style="width:140px; padding:6px 8px; font-size:12px">
+            <button type="button" class="secondary" onclick="saveAccountPassword(${idx}, '${esc(row.key)}')">ບັນທຶກ</button>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  window.saveAccountPassword = async function (idx, accountKey) {
+    if (currentUser?.role !== 'admin') return;
+    const newPass = ($('passInput_' + idx)?.value || '').trim();
+    if (newPass.length < 4) {
+      return setStatus('userMgmtStatus', 'ລະຫັດຜ່ານຕ້ອງມີຢ່າງໜ້ອຍ 4 ຕົວອັກສອນ', 'err');
+    }
+
+    const docId = 'acc_' + (accountKey === ADMIN_ACCOUNT_ID ? 'admin' : btoa(unescape(encodeURIComponent(accountKey))).replace(/[^a-zA-Z0-9]/g, '').slice(0, 24));
+    setStatus('userMgmtStatus', 'ກຳລັງບັນທຶກລະຫັດຜ່ານລົງ Firebase...');
+    try {
+      await reportsCol.doc(docId).set({
+        id: docId,
+        recordKind: 'user_account',
+        accountKey,
+        password: newPass,
+        updated: new Date().toISOString()
+      });
+      setStatus('userMgmtStatus', `ປ່ຽນລະຫັດຜ່ານຂອງ "${accountKey === ADMIN_ACCOUNT_ID ? 'Admin ພະແນກ' : accountKey}" ສຳເລັດແລ້ວ!`, 'ok');
+    } catch (err) {
+      setStatus('userMgmtStatus', 'ບັນທຶກລະຫັດຜ່ານບໍ່ສຳເລັດ: ' + err.message, 'err');
+    }
+  };
+
+  $('loginBtn').onclick = () => {
+    const accountKey = $('loginAccount').value;
+    const pass = $('loginPassword').value.trim();
+    if (!accountKey) return setStatus('loginStatus', 'ກະລຸນາເລືອກພາກສ່ວນ', 'err');
+
+    const expected = getExpectedPassword(accountKey);
+    if (pass !== expected) {
+      return setStatus('loginStatus', 'ລະຫັດຜ່ານບໍ່ຖືກຕ້ອງ! ກະລຸນາລອງໃໝ່.', 'err');
+    }
+
+    const userObj = accountKey === ADMIN_ACCOUNT_ID
+      ? { role: 'admin', department: '' }
+      : { role: 'dept', department: accountKey };
+
+    sessionStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(userObj));
+    setStatus('loginStatus', '');
+    applyAuthSession(userObj);
+  };
+
+  $('loginPassword').onkeydown = e => {
+    if (e.key === 'Enter') $('loginBtn').click();
+  };
+
+  $('logoutBtn').onclick = () => {
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+    clearForm();
+    applyAuthSession(null);
+  };
+
+  // =========================================================
+  // 8. ເລີ່ມຕົ້ນລະບົບ (Initialization)
   // =========================================================
   const now = new Date();
   $('year').value = now.getFullYear();
   $('sumYear').value = now.getFullYear();
   $('month').value = now.getMonth() + 1;
   $('startMonth').value = 1;
+  $('docDateText').value = `${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
+  initLoginDropdown();
   initDeptSelect();
   toggleWeekInput();
   loadAISettings();
   loadRecords();
+
+  const savedSession = JSON.parse(sessionStorage.getItem(AUTH_SESSION_KEY) || 'null');
+  applyAuthSession(savedSession);
 </script>
 </body>
 </html>
