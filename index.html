@@ -529,14 +529,23 @@
     }
 
     /* ===== ຮູບແບບຕອນສັ່ງພິມ (Print / PDF) ===== */
+    .print-only { display: none; }
     @media print {
-      html, body { height: auto !important; overflow: visible !important; display: block !important; }
-      header, .panel, .tabs, .no-print, .footer { display: none !important; }
+      @page { size: A4; margin: 2cm 2cm 2cm 2.5cm; }
+      html, body { height: auto !important; overflow: visible !important; display: block !important; background: #fff !important; }
+      header, .panel, .tabs, .no-print, .footer, #genStatus, #saveSumStatus { display: none !important; }
       .shell { max-width: none; height: auto !important; overflow: visible !important; display: block !important; margin: 0; padding: 0; }
       .layout { display: block; height: auto !important; }
       main { height: auto !important; overflow: visible !important; padding: 0 !important; }
-      .card { border: 0; box-shadow: none; padding: 0; }
-      #result { border: 0; padding: 0; }
+      .card { border: 0 !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; }
+      #result { display: none !important; }
+      #printArea {
+        display: block !important;
+        font-family: "Phetsarath OT", "Saysettha OT", "Noto Sans Lao", "Lao UI", Arial, sans-serif;
+        font-size: 12pt;
+        line-height: 1.55;
+        color: #000;
+      }
     }
   </style>
 </head>
@@ -681,7 +690,7 @@
 
       <!-- ແຖບ 1: ສັງລວມລາຍງານ -->
       <section id="summaryTab">
-        <div class="card">
+        <div class="card no-print">
           <h2>ສ້າງບົດສະຫຼຸບຕາມໄລຍະ</h2>
 
           <div class="two">
@@ -761,6 +770,7 @@
             </div>
           </div>
           <textarea id="result" placeholder="ຜົນການສັງລວມຈະສະແດງຢູ່ບ່ອນນີ້..."></textarea>
+          <div id="printArea" class="print-only"></div>
           <div class="actions no-print">
             <button id="saveSummary" class="green">ບັນທຶກບົດສະຫຼຸບ</button>
             <button id="copy">ຄັດລອກຂໍ້ຄວາມ</button>
@@ -2180,36 +2190,39 @@
         <style>
           @page { size: A4; margin: 2cm 2cm 2cm 2.5cm; }
           body, p, div, td, span { font-family: "Phetsarath OT", "Saysettha OT", Arial, sans-serif; font-size: 12pt; color: #000; }
-          table.hdr { width: 100%; border-collapse: collapse; margin-bottom: 14pt; }
-          table.hdr td { vertical-align: top; padding: 0; font-size: 12pt; line-height: 1.5; }
         </style>
       </head>
       <body>
-        <div style="${fontBase} text-align:center; font-weight:bold; line-height:1.45; margin-bottom:12pt;">
-          <div>ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ</div>
-          <div>ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນະຖາວອນ</div>
-          <div style="font-weight:normal; letter-spacing:1pt;">-------===ooo===-------</div>
-        </div>
+        <p style="${fontBase} margin:0; text-align:center; font-weight:bold; line-height:1.45;">
+          ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ
+        </p>
+        <p style="${fontBase} margin:0; text-align:center; font-weight:bold; line-height:1.45;">
+          ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນະຖາວອນ
+        </p>
+        <p style="${fontBase} margin:0 0 8pt 0; text-align:center; font-weight:normal; line-height:1.45;">
+          -------===ooo===-------
+        </p>
 
-        <table class="hdr">
-          <tr>
-            <td style="${fontBase} width:58%;">
-              <div>ກະຊວງສຶກສາທິການ ແລະ ກິລາ</div>
-              <div style="${targetDept ? '' : 'font-weight:bold;'}">ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງໄຊຍະບູລີ</div>
-              ${targetDept ? `<div style="font-weight:bold;">${esc(targetDept)}</div>` : ''}
-            </td>
-            <td style="${fontBase} width:42%; text-align:right;">
-              <div>ເລກທີ ${esc(docNoDisplay)}</div>
-              <div>ໄຊຍະບູລີ, ວັນທີ ${esc(docDateDisplay)}</div>
-            </td>
-          </tr>
-        </table>
+        <p style="${fontBase} margin:0; text-align:left; font-weight:normal; line-height:1.5;">
+          ແຂວງ ໄຊຍະບູລີ
+        </p>
+        <p style="${fontBase} margin:0; text-align:left; font-weight:normal; line-height:1.5; tab-stops:right 16.5cm;">
+          ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງໄຊຍະບູລີ<span style="mso-tab-count:1">&#9;</span>ເລກທີ ${esc(docNoDisplay)}
+        </p>
+        <p style="${fontBase} margin:0 0 12pt 0; text-align:left; font-weight:normal; line-height:1.5; tab-stops:right 16.5cm;">
+          ${targetDept ? esc(targetDept) : ''}<span style="mso-tab-count:1">&#9;</span>ໄຊຍະບູລີ, ວັນທີ ${esc(docDateDisplay)}
+        </p>
 
-        <div style="${fontBase} text-align:center; font-weight:bold; margin:10pt 0 14pt 0; line-height:1.45;">
-          <div style="font-size:15pt;">ບົດສະຫຼຸບ</div>
-          <div style="font-size:13pt;">ການຈັດຕັ້ງປະຕິບັດວຽກງານ${esc(periodTitle)}</div>
-          ${targetDept ? `<div style="font-size:12.5pt;">ຂອງ ${esc(targetDept)}</div>` : ''}
-        </div>
+        <p style="${fontBase} margin:0; text-align:center; font-weight:bold; font-size:15pt; line-height:1.45;">
+          ບົດສະຫຼຸບ
+        </p>
+        <p style="${fontBase} margin:0${targetDept ? '' : ' 0 12pt 0'}; text-align:center; font-weight:bold; font-size:13pt; line-height:1.45;">
+          ການຈັດຕັ້ງປະຕິບັດວຽກງານ${esc(periodTitle)}
+        </p>
+        ${targetDept ? `
+        <p style="${fontBase} margin:0 0 12pt 0; text-align:center; font-weight:bold; font-size:12.5pt; line-height:1.45;">
+          ຂອງ ${esc(targetDept)}
+        </p>` : ''}
 
         ${paragraphs}
 
@@ -2235,7 +2248,107 @@
     downloadFile(fileName, '\ufeff' + docHtml, 'application/msword;charset=utf-8');
     setStatus('genStatus', 'ດາວໂຫຼດໄຟລ໌ Word (.doc) ຮູບແບບທາງການສຳເລັດ', 'ok');
   };
-  $('print').onclick = () => window.print();
+  function syncPrintArea() {
+    const area = $('printArea');
+    if (!area) return;
+    const content = $('result').value.trim();
+    if (!content) {
+      area.innerHTML = '';
+      return;
+    }
+
+    const { y, n, start, months } = getSelectedRange();
+    const end = months[months.length - 1];
+    const targetDept = currentUser?.role === 'dept'
+      ? currentUser.department
+      : activeViewScope.trim();
+
+    const periodTitle = n === 1
+      ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
+      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
+
+    const rawDocNo = ($('docNumber')?.value || '').trim();
+    const suffixCode = !targetDept ? 'ສກຂ.ຊຍ' : (/^ສູນ/.test(targetDept) ? 'ສນ' : (/^ຫ້ອງການ/.test(targetDept) ? 'ຫກ' : 'ຂໜ'));
+    const docNoDisplay = rawDocNo || `............/${suffixCode}`;
+    const rawDocDate = ($('docDateText')?.value || '').trim();
+    const docDateDisplay = rawDocDate || `....../....../${y}`;
+
+    const lines = content.split(/\n+/).map(l => l.trim()).filter(Boolean);
+    if (lines.length && /^ບົດສະຫຼຸບ/.test(lines[0])) {
+      lines.shift();
+    }
+
+    const paragraphs = lines.map(line => {
+      const isMajorPart = /^ພາກທີ\s+[I|V|X|1-3]/i.test(line);
+      const isNumberedDept = /^[0-9]+\.\s+/.test(line);
+      const isSubBullet = /^([0-9]+\.[0-9]+|[ກ-ຮ]\.|•|-)\s*/.test(line);
+
+      if (isMajorPart) {
+        return `<p style="margin:14pt 0 6pt 0; font-weight:bold; font-size:13pt; line-height:1.45;">${esc(line)}</p>`;
+      }
+      if (isNumberedDept) {
+        return `<p style="margin:8pt 0 4pt 0.4cm; font-weight:bold; font-size:12pt; line-height:1.5;">${esc(line)}</p>`;
+      }
+      if (isSubBullet) {
+        return `<p style="margin:3pt 0 3pt 0.9cm; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+      }
+      return `<p style="margin:0 0 6pt 0; text-indent:1.25cm; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+    }).join('');
+
+    const signerTitle = !targetDept
+      ? 'ຫົວໜ້າພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ'
+      : (/^ສູນ/.test(targetDept) ? 'ຜູ້ອຳນວຍການ' + targetDept : 'ຫົວໜ້າ' + targetDept);
+
+    area.innerHTML = `
+      <div style="text-align:center; font-weight:bold; line-height:1.45; margin-bottom:8pt;">
+        <div>ສາທາລະນະລັດ ປະຊາທິປະໄຕ ປະຊາຊົນລາວ</div>
+        <div>ສັນຕິພາບ ເອກະລາດ ປະຊາທິປະໄຕ ເອກະພາບ ວັດທະນະຖາວອນ</div>
+        <div style="font-weight:normal;">-------===ooo===-------</div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; line-height:1.5; margin-bottom:12pt;">
+        <div style="text-align:left;">
+          <div>ແຂວງ ໄຊຍະບູລີ</div>
+          <div>ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງໄຊຍະບູລີ</div>
+          ${targetDept ? `<div>${esc(targetDept)}</div>` : ''}
+        </div>
+        <div style="text-align:right;">
+          <div>&nbsp;</div>
+          <div>ເລກທີ ${esc(docNoDisplay)}</div>
+          <div>ໄຊຍະບູລີ, ວັນທີ ${esc(docDateDisplay)}</div>
+        </div>
+      </div>
+
+      <div style="text-align:center; font-weight:bold; margin:6pt 0 12pt 0; line-height:1.45;">
+        <div style="font-size:15pt;">ບົດສະຫຼຸບ</div>
+        <div style="font-size:13pt;">ການຈັດຕັ້ງປະຕິບັດວຽກງານ${esc(periodTitle)}</div>
+        ${targetDept ? `<div style="font-size:12.5pt;">ຂອງ ${esc(targetDept)}</div>` : ''}
+      </div>
+
+      ${paragraphs}
+
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-top:26pt; break-inside:avoid;">
+        <div style="width:48%; font-size:11pt; line-height:1.5;">
+          <div style="font-weight:bold; text-decoration:underline;">ບ່ອນສົ່ງ:</div>
+          <div>- ຄະນະພະແນກ (ເພື່ອລາຍງານ)</div>
+          <div>- ບັນດາຂະແໜງການ/ສູນ (ເພື່ອຊາບ)</div>
+          <div>- ເກັບມ້ຽນ</div>
+        </div>
+        <div style="width:52%; text-align:center; font-weight:bold; line-height:1.5;">
+          <div>${esc(signerTitle)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  window.addEventListener('beforeprint', syncPrintArea);
+  $('print').onclick = () => {
+    if (!$('result').value.trim()) {
+      return setStatus('genStatus', 'ຍັງບໍ່ມີເນື້ອໃນບົດສະຫຼຸບສຳລັບພິມ', 'err');
+    }
+    syncPrintArea();
+    window.print();
+  };
 
   // ຕັ້ງຄ່າ AI
   function loadAISettings() {
