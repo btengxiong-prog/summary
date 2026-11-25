@@ -884,15 +884,6 @@
               <option value="">ບົດລວມຂອງພະແນກ (ທຸກຂະແໜງການ / ສູນ)</option>
             </select>
           </div>
-          <input id="summaryTitle" class="no-print" placeholder="ຊື່ບົດສະຫຼຸບ (ເຊັ່ນ: ບົດສະຫຼຸບ 3 ເດືອນ ຕຸລາ - ທັນວາ 2026)..." style="margin-bottom:8px">
-          <div class="two no-print" style="margin-bottom:10px">
-            <div>
-              <input id="docNumber" placeholder="ເລກທີເອກະສານ Word (ເຊັ່ນ: 025/ສກຂ.ຊຍ)">
-            </div>
-            <div>
-              <input id="docDateText" placeholder="ວັນທີລົງລາຍເຊັນ (ເຊັ່ນ: 25 ພະຈິກ 2026)">
-            </div>
-          </div>
           <textarea id="result" placeholder="ຜົນການສັງລວມຈະສະແດງຢູ່ບ່ອນນີ້..."></textarea>
           <div id="printArea" class="print-only"></div>
           <div class="actions no-print">
@@ -1279,7 +1270,7 @@
 
     const overallText = currentSummaryBundle.overall || text;
     const firstLine = overallText.split('\n').map(l => l.trim()).find(Boolean) || '';
-    const title = $('summaryTitle').value.trim() || firstLine.slice(0, 80) || `ບົດສະຫຼຸບ ${periodLabel}`;
+    const title = firstLine.slice(0, 85) || `ບົດສະຫຼຸບ ${periodLabel}`;
 
     let targetId = 'sum' + Date.now() + Math.random().toString(16).slice(2, 6);
     if (editingSummaryId) {
@@ -1314,7 +1305,6 @@
     try {
       await reportsCol.doc(item.id).set(item);
       editingSummaryId = item.id;
-      $('summaryTitle').value = title;
       setStatus('saveSumStatus', 'ບັນທຶກບົດສະຫຼຸບສຳເລັດແລ້ວ!', 'ok');
     } catch (error) {
       setStatus('saveSumStatus', 'ບັນທຶກບໍ່ສຳເລັດ: ' + error.message, 'err');
@@ -1323,12 +1313,12 @@
     }
   }
 
-  window.openSavedSummary = function (id) {
+  
+      window.openSavedSummary = function (id) {
     const s = savedSummaries.find(x => x.id === id);
     if (!s) return;
 
     editingSummaryId = s.id;
-    $('summaryTitle').value = s.title || '';
     currentSummaryBundle = {
       overall: s.text || '',
       byDept: s.byDept || (s.department ? { [s.department]: s.text || '' } : {})
@@ -2360,7 +2350,6 @@
     currentSummaryBundle = { overall: '', byDept: {} };
     activeViewScope = '';
     refreshViewScopeSelect();
-    $('summaryTitle').value = '';
     $('result').value = '';
     setStatus('genStatus', '');
     setStatus('saveSumStatus', '');
@@ -2398,11 +2387,9 @@
       ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
       : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
 
-    const rawDocNo = ($('docNumber')?.value || '').trim();
     const suffixCode = !targetDept ? 'ສກຂ.ຊຍ' : (/^ສູນ/.test(targetDept) ? 'ສນ' : (/^ຫ້ອງການ/.test(targetDept) ? 'ຫກ' : 'ຂໜ'));
-    const docNoDisplay = rawDocNo || `............/${suffixCode}`;
-    const rawDocDate = ($('docDateText')?.value || '').trim();
-    const docDateDisplay = rawDocDate || `....../....../${y}`;
+    const docNoDisplay = `............/${suffixCode}`;
+    const docDateDisplay = `....../....../${y}`;
 
     const lines = content
       .split(/\n+/)
@@ -2411,20 +2398,25 @@
 
     const fontBase = 'font-family:"Phetsarath OT","Saysettha OT",Arial,sans-serif;';
     const paragraphs = lines.map(line => {
-      const isMajorPart = /^ພາກທີ\s+[I|V|X|1-3]/i.test(line);
-      const isNumberedDept = /^[0-9]+\.\s+/.test(line);
+      const cleanLine = line.replace(/^[-•*]\s*/, '');
+      const isMajorPart = /^ພາກທີ\s*([IVXⅠⅡⅢ1-9]+)/i.test(cleanLine);
+      const isNumberedDept = /^[0-9]+\.\s*(ຂະແໜງ|ສູນ|ຫ້ອງການ)/.test(cleanLine);
+      const isNumberedItem = /^[0-9]+\.\s+/.test(cleanLine);
       const isSubBullet = /^([0-9]+\.[0-9]+|[ກ-ຮ]\.|•|-)\s*/.test(line);
 
       if (isMajorPart) {
-        return `<p style="${fontBase} margin:14pt 0 6pt 0; font-weight:bold; font-size:13pt; line-height:1.45;">${esc(line)}</p>`;
+        return `<p style="${fontBase} margin:14pt 0 6pt 0; font-weight:bold; font-size:13pt; line-height:1.45;"><strong>${esc(cleanLine)}</strong></p>`;
       }
       if (isNumberedDept) {
-        return `<p style="${fontBase} margin:8pt 0 4pt 0.4cm; font-weight:bold; font-size:12pt; line-height:1.5;">${esc(line)}</p>`;
+        return `<p style="${fontBase} margin:8pt 0 4pt 0.4cm; font-weight:bold; font-size:12pt; line-height:1.5;"><strong>${esc(cleanLine)}</strong></p>`;
+      }
+      if (isNumberedItem) {
+        return `<p style="${fontBase} margin:3pt 0 3pt 0.6cm; font-weight:normal; font-size:12pt; line-height:1.55; text-align:justify;">${esc(cleanLine)}</p>`;
       }
       if (isSubBullet) {
-        return `<p style="${fontBase} margin:3pt 0 3pt 0.9cm; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+        return `<p style="${fontBase} margin:3pt 0 3pt 0.9cm; font-weight:normal; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
       }
-      return `<p style="${fontBase} margin:0 0 6pt 0; text-indent:1.25cm; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+      return `<p style="${fontBase} margin:0 0 6pt 0; text-indent:1.25cm; font-weight:normal; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
     }).join('');
 
     const signerTitle = !targetDept
@@ -2517,11 +2509,9 @@
       ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
       : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
 
-    const rawDocNo = ($('docNumber')?.value || '').trim();
     const suffixCode = !targetDept ? 'ສກຂ.ຊຍ' : (/^ສູນ/.test(targetDept) ? 'ສນ' : (/^ຫ້ອງການ/.test(targetDept) ? 'ຫກ' : 'ຂໜ'));
-    const docNoDisplay = rawDocNo || `............/${suffixCode}`;
-    const rawDocDate = ($('docDateText')?.value || '').trim();
-    const docDateDisplay = rawDocDate || `....../....../${y}`;
+    const docNoDisplay = `............/${suffixCode}`;
+    const docDateDisplay = `....../....../${y}`;
 
     const lines = content
       .split(/\n+/)
@@ -2529,20 +2519,25 @@
       .filter(l => l && !/^[-•*]?\s*ບົດສະຫຼຸບ/.test(l));
 
     const paragraphs = lines.map(line => {
-      const isMajorPart = /^ພາກທີ\s+[I|V|X|1-3]/i.test(line);
-      const isNumberedDept = /^[0-9]+\.\s+/.test(line);
+      const cleanLine = line.replace(/^[-•*]\s*/, '');
+      const isMajorPart = /^ພາກທີ\s*([IVXⅠⅡⅢ1-9]+)/i.test(cleanLine);
+      const isNumberedDept = /^[0-9]+\.\s*(ຂະແໜງ|ສູນ|ຫ້ອງການ)/.test(cleanLine);
+      const isNumberedItem = /^[0-9]+\.\s+/.test(cleanLine);
       const isSubBullet = /^([0-9]+\.[0-9]+|[ກ-ຮ]\.|•|-)\s*/.test(line);
 
       if (isMajorPart) {
-        return `<p style="margin:14pt 0 6pt 0; font-weight:bold; font-size:13pt; line-height:1.45;">${esc(line)}</p>`;
+        return `<p style="margin:14pt 0 6pt 0; font-weight:bold; font-size:13pt; line-height:1.45;"><strong>${esc(cleanLine)}</strong></p>`;
       }
       if (isNumberedDept) {
-        return `<p style="margin:8pt 0 4pt 0.4cm; font-weight:bold; font-size:12pt; line-height:1.5;">${esc(line)}</p>`;
+        return `<p style="margin:8pt 0 4pt 0.4cm; font-weight:bold; font-size:12pt; line-height:1.5;"><strong>${esc(cleanLine)}</strong></p>`;
+      }
+      if (isNumberedItem) {
+        return `<p style="margin:3pt 0 3pt 0.6cm; font-weight:normal; font-size:12pt; line-height:1.55; text-align:justify;">${esc(cleanLine)}</p>`;
       }
       if (isSubBullet) {
-        return `<p style="margin:3pt 0 3pt 0.9cm; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+        return `<p style="margin:3pt 0 3pt 0.9cm; font-weight:normal; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
       }
-      return `<p style="margin:0 0 6pt 0; text-indent:1.25cm; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
+      return `<p style="margin:0 0 6pt 0; text-indent:1.25cm; font-weight:normal; font-size:12pt; line-height:1.55; text-align:justify;">${esc(line)}</p>`;
     }).join('');
 
     const signerTitle = !targetDept
@@ -2885,7 +2880,6 @@
   $('sumYear').value = now.getFullYear();
   $('month').value = now.getMonth() + 1;
   $('startMonth').value = 1;
-  $('docDateText').value = `${now.getDate()} ${MONTHS[now.getMonth()]} ${now.getFullYear()}`;
 
   initLoginDropdown();
   initDeptSelect();
