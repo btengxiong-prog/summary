@@ -349,6 +349,11 @@
         <div class="card">
           <h2>ສ້າງບົດສະຫຼຸບຕາມໄລຍະ</h2>
 
+          <label>ຂອບເຂດບົດສັງລວມ</label>
+          <select id="sumDept">
+            <option value="">1. ບົດລວມຂອງພະແນກ (ທຸກຂະແໜງການ / ສູນ)</option>
+          </select>
+
           <div class="two">
             <div>
               <label>ປີ</label>
@@ -546,6 +551,8 @@
   let editingId = null;
   let savedSummaries = [];
   let editingSummaryId = null;
+  let unsubscribeRealtime = null;
+  let isFirstSnapshot = true;
 
   function esc(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({
@@ -601,21 +608,46 @@
   // =========================================================
   // 3. ການຈັດການຖານຂໍ້ມູນ FIREBASE (Firestore)
   // =========================================================
-  async function loadRecords() {
-    setStatus('dbStatus', 'ກຳລັງໂຫຼດຂໍ້ມູນຈາກ Firebase...');
-    try {
-      const snap = await reportsCol.get();
-      const allDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      records = allDocs.filter(d => d.recordKind !== 'saved_summary');
-      savedSummaries = allDocs
-        .filter(d => d.recordKind === 'saved_summary')
-        .sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')));
-      renderWeekList();
-      renderSavedSummaries();
-      setStatus('dbStatus', `ເຊື່ອມຕໍ່ Firebase ແລ້ວ (${records.length} ລາຍການ)`, 'ok');
-    } catch (error) {
-      setStatus('dbStatus', 'ໂຫຼດຂໍ້ມູນບໍ່ສຳເລັດ: ' + error.message, 'err');
+  function loadRecords() {
+    if (unsubscribeRealtime) {
+      unsubscribeRealtime();
+      unsubscribeRealtime = null;
     }
+    isFirstSnapshot = true;
+    setStatus('dbStatus', 'ກຳລັງເຊື່ອມຕໍ່ Firebase Realtime...');
+
+    unsubscribeRealtime = reportsCol.onSnapshot(
+      snap => {
+        const allDocs = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        records = allDocs.filter(d => d.recordKind !== 'saved_summary');
+        savedSummaries = allDocs
+          .filter(d => d.recordKind === 'saved_summary')
+          .sort((a, b) => String(b.updated || '').localeCompare(String(a.updated || '')));
+
+        // ຖ້າລາຍການທີ່ກຳລັງເປີດແກ້ໄຂຖືກລຶບຈາກເຄື່ອງອື່ນ ໃຫ້ລ້າງຟອມອັດຕະໂນມັດ
+        if (editingId && !records.some(r => r.id === editingId)) {
+          clearForm();
+        }
+        if (editingSummaryId && !savedSummaries.some(s => s.id === editingSummaryId)) {
+          editingSummaryId = null;
+        }
+
+        renderWeekList();
+        renderSavedSummaries();
+
+        const timeNow = new Date().toLocaleTimeString('lo-LA');
+        const hasRemoteUpdate = !isFirstSnapshot && !snap.metadata.hasPendingWrites && snap.docChanges().length > 0;
+        const msg = hasRemoteUpdate
+          ? `● ຊິ້ງ Realtime ແລ້ວ (${records.length} ລາຍການ · ອັບເດດໃໝ່ເວລາ ${timeNow})`
+          : `● ເຊື່ອມຕໍ່ Realtime ແລ້ວ (${records.length} ລາຍການ · ${timeNow})`;
+
+        setStatus('dbStatus', msg, 'ok');
+        isFirstSnapshot = false;
+      },
+      error => {
+        setStatus('dbStatus', 'ເຊື່ອມຕໍ່ Realtime ບໍ່ສຳເລັດ: ' + error.message, 'err');
+      }
+    );
   }
 
   async function loadSummaries() {
@@ -664,9 +696,11 @@
 
     const { y, n, start, months } = getSelectedRange();
     const end = months[months.length - 1];
-    const periodLabel = n === 1
+    const targetDept = ($('sumDept')?.value || '').trim();
+    const scopeTag = targetDept ? `[${targetDept}] ` : '[ລວມພະແນກ] ';
+    const periodLabel = scopeTag + (n === 1
       ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ${y}`
-      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ${y})`;
+      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ${y})`);
 
     const firstLine = text.split('\n').map(l => l.trim()).find(Boolean) || '';
     const title = $('summaryTitle').value.trim() || firstLine.slice(0, 80) || `ບົດສະຫຼຸບ ${periodLabel}`;
@@ -680,6 +714,7 @@
     const item = {
       id: targetId,
       recordKind: 'saved_summary',
+      department: targetDept,
       year: y,
       period: n,
       startMonth: start,
@@ -695,11 +730,6 @@
       await reportsCol.doc(item.id).set(item);
       editingSummaryId = item.id;
       $('summaryTitle').value = title;
-      const exists = savedSummaries.some(x => x.id === item.id);
-      savedSummaries = exists
-        ? savedSummaries.map(x => (x.id === item.id ? item : x))
-        : [item, ...savedSummaries];
-      renderSavedSummaries();
       setStatus('saveSumStatus', 'ບັນທຶກບົດສະຫຼຸບໄວ້ໃນລະບົບສຳເລັດແລ້ວ!', 'ok');
     } catch (error) {
       setStatus('saveSumStatus', 'ບັນທຶກບໍ່ສຳເລັດ: ' + error.message, 'err');
@@ -715,6 +745,7 @@
     editingSummaryId = s.id;
     $('summaryTitle').value = s.title || '';
     $('result').value = s.text || '';
+    if ($('sumDept')) $('sumDept').value = s.department || '';
     if (s.year) $('sumYear').value = s.year;
     if (s.period) $('period').value = String(s.period);
     if (s.startMonth) $('startMonth').value = String(s.startMonth);
@@ -730,8 +761,6 @@
     try {
       await reportsCol.doc(id).delete();
       if (editingSummaryId === id) editingSummaryId = null;
-      savedSummaries = savedSummaries.filter(x => x.id !== id);
-      renderSavedSummaries();
       setStatus('saveSumStatus', 'ລຶບບົດສະຫຼຸບສຳເລັດ', 'ok');
     } catch (error) {
       setStatus('saveSumStatus', 'ລຶບບໍ່ສຳເລັດ: ' + error.message, 'err');
@@ -796,15 +825,7 @@
 
     try {
       await reportsCol.doc(row.id).set(row);
-
-      if (editingId || duplicate) {
-        records = records.map(r => (r.id === targetId ? row : r));
-      } else {
-        records.push(row);
-      }
-
       clearForm();
-      renderWeekList();
       setStatus('dbStatus', 'ບັນທຶກລົງ Firebase ສຳເລັດ', 'ok');
     } catch (error) {
       setStatus('dbStatus', 'ບັນທຶກບໍ່ສຳເລັດ: ' + error.message, 'err');
@@ -842,8 +863,7 @@
     setStatus('dbStatus', 'ກຳລັງລຶບຂໍ້ມູນ...');
     try {
       await reportsCol.doc(id).delete();
-      records = records.filter(x => x.id !== id);
-      renderWeekList();
+      if (editingId === id) clearForm();
       setStatus('dbStatus', 'ລຶບລາຍງານສຳເລັດ', 'ok');
     } catch (error) {
       setStatus('dbStatus', 'ລຶບບໍ່ສຳເລັດ: ' + error.message, 'err');
@@ -871,6 +891,14 @@
         '<option value="">-- ສະແດງທຸກພາກສ່ວນ --</option>' +
         allDepts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
       if (curFilter) $('filterDept').value = curFilter;
+    }
+
+    if ($('sumDept')) {
+      const curSum = $('sumDept').value;
+      $('sumDept').innerHTML =
+        '<option value="">1. ບົດລວມຂອງພະແນກ (ທຸກຂະແໜງການ / ສູນ)</option>' +
+        allDepts.map(d => `<option value="${esc(d)}">2. ສະເພາະ: ${esc(d)}</option>`).join('');
+      if (curSum) $('sumDept').value = curSum;
     }
   }
 
@@ -958,20 +986,30 @@
 
   function getSelectedRecords() {
     const { months } = getSelectedRange();
+    const targetDept = ($('sumDept')?.value || '').trim();
     return records
-      .filter(r => months.some(m => m.year === r.year && m.month === r.month))
+      .filter(r => {
+        const matchTime = months.some(m => m.year === r.year && m.month === r.month);
+        if (!matchTime) return false;
+        if (targetDept && (r.department || '').trim() !== targetDept) return false;
+        return true;
+      })
       .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week || 0) - Number(b.week || 0));
   }
 
   function updateStats() {
     if (!$('stats')) return;
     const { n } = getSelectedRange();
+    const targetDept = ($('sumDept')?.value || '').trim();
     const rs = getSelectedRecords();
     const submittedDepts = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean)).size;
     const totalChars = rs.reduce((sum, r) => sum + r.text.length, 0).toLocaleString();
+    const deptStatHtml = targetDept
+      ? `<div class="stat"><b>1</b> ພາກສ່ວນທີ່ເລືອກ</div>`
+      : `<div class="stat"><b>${submittedDepts}/${DEPARTMENTS.length}</b> ພາກສ່ວນທີ່ມີບົດ</div>`;
 
     $('stats').innerHTML = `
-      <div class="stat"><b>${submittedDepts}/${DEPARTMENTS.length}</b> ພາກສ່ວນທີ່ມີບົດ</div>
+      ${deptStatHtml}
       <div class="stat"><b>${rs.length}</b> ບົດລາຍງານ</div>
       <div class="stat"><b>${n}</b> ເດືອນ</div>
       <div class="stat"><b>${totalChars}</b> ຕົວອັກສອນ</div>
@@ -989,12 +1027,39 @@
     const { y, n, start, months } = getSelectedRange();
     const end = months[months.length - 1];
     const style = $('style').value;
+    const targetDept = ($('sumDept')?.value || '').trim();
 
     const styleMap = {
       concise: 'ຂຽນໃຫ້ກະຊັບ ແຕ່ຄົບປະເດັນ.',
       detailed: 'ຂຽນລະອຽດ ຈັດໝວດວຽກງານ ແລະ ຮັກສາລາຍລະອຽດສຳຄັນ.',
       official: 'ໃຊ້ສຳນວນພາສາລາຊະການທາງການ ສຸພາບ ແລະ ໜັກແໜ້ນ.'
     };
+
+    if (targetDept) {
+      const body = rs.map(r => {
+        const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
+        const timeTag = isMonthly
+          ? `ລາຍງານປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}`
+          : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
+        return `[${timeTag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
+      }).join('\n\n');
+
+      return [
+        `ຈົ່ງສັງເຄາະບົດລາຍງານທັງໝົດຂອງ "${targetDept}" ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${targetDept}" ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}). ${styleMap[style]}`,
+        '',
+        'ຫຼັກການສັງເຄາະ:',
+        `1. ຫົວບົດ ແລະ ພາບລວມໃຫ້ຂຽນໃນນາມ "${targetDept}" (ຂຶ້ນກັບພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ) ແລ້ວຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື:`,
+        '   - ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ (ສັງເຄາະລວມເນື້ອໃນຈາກທຸກອາທິດ/ເດືອນເຂົ້າກັນ ຈັດລຽງເປັນຂໍ້ໆຕາມໜ້າວຽກໃຫ້ຊັດເຈນ, ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ).',
+        '   - ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ (ສັງລວມຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄ້າງຂອງພາກສ່ວນ).',
+        '   - ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ (ສັງລວມທິດທາງແຜນການຈຸດສຸມໃນໄລຍະຕໍ່ໄປ ໂດຍຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ).',
+        '2. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ ຫຼື ເຫດການທີ່ບໍ່ມີໃນຂໍ້ມູນຕົ້ນສະບັບ.',
+        '3. ຂຽນໃຫ້ຈົບຄົບຖ້ວນທັງ 3 ພາກ ດ້ວຍພາສາລາວທາງການ 100%, ຫ້າມປົນຕົວອັກສອນພາສາໄທ ຫຼື ພາສາຂະແມ ແລະ ຫ້າມຂຽນຄຳແປໃນວົງເລັບ.',
+        '4. ຕອບເປັນຂໍ້ຄວາມທຳມະດາ (Plain Text) ເທົ່ານັ້ນ, ຫ້າມໃຊ້ສັນຍາລັກ Markdown ເຊັ່ນ **, ###, --- ຫຼື __ ຢ່າງເດັດຂາດ.',
+        '',
+        `ຂໍ້ມູນຕົ້ນສະບັບຂອງ ${targetDept}:`,
+        body
+      ].join('\n');
+    }
 
     const allDepts = getAllDepartments();
     const activeDepts = allDepts.filter(d => rs.some(r => (r.department || '').trim() === d));
@@ -1056,7 +1121,8 @@
   function fallbackSummary(rs) {
     const { y, n, start, months } = getSelectedRange();
     const endMonth = MONTHS[months[months.length - 1].month - 1];
-    const allDepts = getAllDepartments();
+    const targetDept = ($('sumDept')?.value || '').trim();
+    const allDepts = targetDept ? [targetDept] : getAllDepartments();
     let idx = 0;
     const part1List = [];
     const part2List = [];
@@ -1102,22 +1168,38 @@
         });
       });
 
-      if (p1.length) part1List.push(`${idx}. ${dept}\n${p1.join('\n')}`);
-      if (p2.length) part2List.push(`${dept}:\n${p2.join('\n')}`);
-      if (p3.length) part3List.push(`${dept}:\n${p3.join('\n')}`);
+      if (targetDept) {
+        part1List.push(...p1);
+        part2List.push(...p2);
+        part3List.push(...p3);
+      } else {
+        if (p1.length) part1List.push(`${idx}. ${dept}\n${p1.join('\n')}`);
+        if (p2.length) part2List.push(`${dept}:\n${p2.join('\n')}`);
+        if (p3.length) part3List.push(`${dept}:\n${p3.join('\n')}`);
+      }
     });
 
+    const mainHeader = targetDept
+      ? `ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${targetDept} ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`
+      : `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`;
+
+    const part1Title = targetDept
+      ? 'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ'
+      : 'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ';
+
+    const sep = targetDept ? '\n' : '\n\n';
+
     return [
-      `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`,
+      mainHeader,
       '',
-      'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ',
-      part1List.join('\n\n') || '- ບໍ່ມີຂໍ້ມູນ',
+      part1Title,
+      part1List.join(sep) || '- ບໍ່ມີຂໍ້ມູນ',
       '',
       'ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ',
-      part2List.join('\n\n') || '- ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງທີ່ລະບຸໄວ້',
+      part2List.join(sep) || '- ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງທີ່ລະບຸໄວ້',
       '',
       'ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ',
-      part3List.join('\n\n') || '- ສືບຕໍ່ຈັດຕັ້ງປະຕິບັດແຜນວຽກຈຸດສຸມໃນໄລຍະຕໍ່ໄປໃຫ້ສຳເລັດຕາມຄາດໝາຍ'
+      part3List.join(sep) || '- ສືບຕໍ່ຈັດຕັ້ງປະຕິບັດແຜນວຽກຈຸດສຸມໃນໄລຍະຕໍ່ໄປໃຫ້ສຳເລັດຕາມຄາດໝາຍ'
     ].join('\n');
   }
 
@@ -1429,6 +1511,7 @@
   $('filterDept').onchange = renderWeekList;
   $('searchReport').oninput = renderWeekList;
   $('reportType').onchange = toggleWeekInput;
+  $('sumDept').onchange = updateStats;
   $('sumYear').onchange = updateStats;
   $('period').onchange = updateStats;
   $('startMonth').onchange = updateStats;
@@ -1599,6 +1682,7 @@
 
     const { y, n, start, months } = getSelectedRange();
     const end = months[months.length - 1];
+    const targetDept = ($('sumDept')?.value || '').trim();
     const periodTitle = n === 1
       ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
       : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
@@ -1645,10 +1729,11 @@
           <tr>
             <td style="width:58%;">
               <div>ກະຊວງສຶກສາທິການ ແລະ ກິລາ</div>
-              <div style="font-weight:bold;">ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງໄຊຍະບູລີ</div>
+              <div style="${targetDept ? '' : 'font-weight:bold;'}">ພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງໄຊຍະບູລີ</div>
+              ${targetDept ? `<div style="font-weight:bold;">${esc(targetDept)}</div>` : ''}
             </td>
             <td style="width:42%; text-align:right;">
-              <div>ເລກທີ ............/ສກຂ.ຊຍ</div>
+              <div>ເລກທີ ............/${targetDept ? 'ຂໜ' : 'ສກຂ.ຊຍ'}</div>
               <div>ໄຊຍະບູລີ, ວັນທີ ....../....../${y}</div>
             </td>
           </tr>
@@ -1657,6 +1742,7 @@
         <div style="text-align:center; font-weight:bold; margin:10pt 0 14pt 0; line-height:1.45;">
           <div style="font-size:15pt;">ບົດສະຫຼຸບ</div>
           <div style="font-size:13pt;">ການຈັດຕັ້ງປະຕິບັດວຽກງານ${esc(periodTitle)}</div>
+          ${targetDept ? `<div style="font-size:12.5pt;">ຂອງ ${esc(targetDept)}</div>` : ''}
         </div>
 
         ${paragraphs}
@@ -1665,7 +1751,7 @@
           <tr>
             <td style="width:50%;"></td>
             <td style="width:50%; text-align:center; font-weight:bold; line-height:1.5;">
-              <div>ຫົວໜ້າພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ</div>
+              <div>${esc(!targetDept ? 'ຫົວໜ້າພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ' : (/^ສູນ/.test(targetDept) ? 'ຜູ້ອຳນວຍການ' + targetDept : 'ຫົວໜ້າ' + targetDept))}</div>
               <br><br><br>
             </td>
           </tr>
@@ -1673,7 +1759,8 @@
       </body>
       </html>`;
 
-    const fileName = `ບົດສະຫຼຸບ_${periodTitle.replace(/\s+/g, '_')}.doc`;
+    const scopeFileTag = targetDept ? targetDept.replace(/\s+/g, '_') : 'ລວມພະແນກ';
+    const fileName = `ບົດສະຫຼຸບ_${scopeFileTag}_${periodTitle.replace(/\s+/g, '_')}.doc`;
     downloadFile(fileName, '\ufeff' + docHtml, 'application/msword;charset=utf-8');
     setStatus('genStatus', 'ດາວໂຫຼດໄຟລ໌ Word (.doc) ຮູບແບບທາງການສຳເລັດ', 'ok');
   };
