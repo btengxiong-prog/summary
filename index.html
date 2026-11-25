@@ -223,10 +223,33 @@
     .panel label {
       color: #e6efff;
     }
-    .panel input, .panel select, .panel textarea {
+    .panel input, .panel select {
+      background: #2e7fd6;
+      color: #ffffff;
+      font-weight: 700;
+      border: 1.5px solid #8ec5ff;
+      color-scheme: dark;
+    }
+    .panel input::placeholder {
+      color: rgba(255, 255, 255, 0.78);
+      font-weight: 400;
+    }
+    .panel input:focus, .panel select:focus {
+      background: #368ae3;
+      border-color: #ffffff;
+      outline: 2px solid rgba(142, 197, 255, 0.5);
+    }
+    .panel select option {
+      background: #1b4f9c;
+      color: #ffffff;
+      font-weight: 700;
+    }
+    .panel textarea {
       background: #ffffff;
       color: #1c2938;
+      font-weight: 400;
       border: 1px solid rgba(255, 255, 255, 0.35);
+      color-scheme: light;
     }
     .panel #saveWeek {
       background: #2563eb;
