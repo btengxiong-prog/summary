@@ -349,11 +349,6 @@
         <div class="card">
           <h2>ສ້າງບົດສະຫຼຸບຕາມໄລຍະ</h2>
 
-          <label>ຂອບເຂດບົດສັງລວມ</label>
-          <select id="sumDept">
-            <option value="">1. ບົດລວມຂອງພະແນກ (ທຸກຂະແໜງການ / ສູນ)</option>
-          </select>
-
           <div class="two">
             <div>
               <label>ປີ</label>
@@ -402,8 +397,8 @@
           <div class="stats" id="stats"></div>
 
           <div class="actions no-print">
-            <button id="generate" class="green">ສັງລວມບົດລາຍງານ (ອັດຕະໂນມັດ)</button>
-            <button id="smartInstant" style="background:#1d5b96">ສັງລວມທັນທີ (ບໍ່ງໍ້ເຊີບເວີ AI)</button>
+            <button id="generate" class="green">ສັງລວມບົດລາຍງານ (ໃຊ້ AI)</button>
+            <button id="smartInstant" style="background:#1d5b96">ສັງລວມທັນທີ (ບໍ່ໃຊ້ AI)</button>
             <button id="copyForWebAI" class="secondary">ຄັດລອກໄປວາງໃນ AI</button>
             <button id="clearResult" class="secondary">ລ້າງຜົນສະຫຼຸບ</button>
           </div>
@@ -411,14 +406,20 @@
         </div>
 
         <div class="card">
-          <div class="actions no-print" style="justify-content:space-between; margin-top:0">
-            <h2>ຜົນການສັງລວມ</h2>
+          <div class="actions no-print" style="justify-content:space-between; align-items:center; margin-top:0; margin-bottom:10px">
+            <h2 style="margin:0">ຜົນການສັງລວມ</h2>
             <span class="small">ສາມາດແກ້ໄຂຂໍ້ຄວາມໄດ້</span>
+          </div>
+          <div class="no-print" style="background:#f2f6fb; border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:10px">
+            <label style="margin:0 0 5px">ເລືອກເບິ່ງບົດສະຫຼຸບ (ບົດລວມພະແນກ ຫຼື ບົດຍ່ອຍແຕ່ລະຂະແໜງການ)</label>
+            <select id="viewSummaryScope">
+              <option value="">ບົດລວມຂອງພະແນກ (ທຸກຂະແໜງການ / ສູນ)</option>
+            </select>
           </div>
           <input id="summaryTitle" class="no-print" placeholder="ຊື່ບົດສະຫຼຸບ (ເຊັ່ນ: ບົດສະຫຼຸບ 3 ເດືອນ ຕຸລາ - ທັນວາ 2026)..." style="margin-bottom:10px">
           <textarea id="result" placeholder="ຜົນການສັງລວມຈະສະແດງຢູ່ບ່ອນນີ້..."></textarea>
           <div class="actions no-print">
-            <button id="saveSummary" class="green">ບັນທຶກບົດສະຫຼຸບໄວ້ໃນລະບົບ</button>
+            <button id="saveSummary" class="green">ບັນທຶກບົດສະຫຼຸບ</button>
             <button id="copy">ຄັດລອກຂໍ້ຄວາມ</button>
             <button class="secondary" id="downloadTxt">ດາວໂຫຼດ TXT</button>
             <button class="secondary" id="downloadDoc">ດາວໂຫຼດ Word (.doc)</button>
@@ -429,7 +430,7 @@
 
         <div class="card no-print">
           <div class="actions" style="justify-content:space-between; align-items:center; margin-top:0; margin-bottom:10px">
-            <h2 style="margin:0">ຄັງບົດສະຫຼຸບທີ່ບັນທຶກໄວ້ (Firebase)</h2>
+            <h2 style="margin:0">ຄັງບົດສະຫຼຸບທີ່ບັນທຶກ</h2>
             <button type="button" class="secondary" id="refreshSummaries" style="padding:5px 10px; font-size:12px">ໂຫຼດໃໝ່</button>
           </div>
           <input id="searchSavedSummary" type="search" placeholder="ຄົ້ນຫາຊື່ບົດສະຫຼຸບ ຫຼື ໄລຍະເວລາ..." style="margin-bottom:10px">
@@ -553,6 +554,8 @@
   let editingSummaryId = null;
   let unsubscribeRealtime = null;
   let isFirstSnapshot = true;
+  let currentSummaryBundle = { overall: '', byDept: {} };
+  let activeViewScope = '';
 
   function esc(str) {
     return String(str ?? '').replace(/[&<>"']/g, c => ({
@@ -694,15 +697,17 @@
       return setStatus('saveSumStatus', 'ຍັງບໍ່ມີເນື້ອໃນຜົນການສັງລວມສຳລັບບັນທຶກ', 'err');
     }
 
+    syncCurrentEditorToBundle();
     const { y, n, start, months } = getSelectedRange();
     const end = months[months.length - 1];
-    const targetDept = ($('sumDept')?.value || '').trim();
-    const scopeTag = targetDept ? `[${targetDept}] ` : '[ລວມພະແນກ] ';
+    const deptCount = Object.keys(currentSummaryBundle.byDept || {}).length;
+    const scopeTag = deptCount ? `[ລວມພະແນກ + ${deptCount} ພາກສ່ວນ] ` : '[ລວມພະແນກ] ';
     const periodLabel = scopeTag + (n === 1
       ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ${y}`
       : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ${y})`);
 
-    const firstLine = text.split('\n').map(l => l.trim()).find(Boolean) || '';
+    const overallText = currentSummaryBundle.overall || text;
+    const firstLine = overallText.split('\n').map(l => l.trim()).find(Boolean) || '';
     const title = $('summaryTitle').value.trim() || firstLine.slice(0, 80) || `ບົດສະຫຼຸບ ${periodLabel}`;
 
     let targetId = 'sum' + Date.now() + Math.random().toString(16).slice(2, 6);
@@ -714,13 +719,13 @@
     const item = {
       id: targetId,
       recordKind: 'saved_summary',
-      department: targetDept,
       year: y,
       period: n,
       startMonth: start,
       periodLabel,
       title,
-      text,
+      text: overallText,
+      byDept: currentSummaryBundle.byDept || {},
       updated: new Date().toISOString()
     };
 
@@ -730,7 +735,7 @@
       await reportsCol.doc(item.id).set(item);
       editingSummaryId = item.id;
       $('summaryTitle').value = title;
-      setStatus('saveSumStatus', 'ບັນທຶກບົດສະຫຼຸບໄວ້ໃນລະບົບສຳເລັດແລ້ວ!', 'ok');
+      setStatus('saveSumStatus', 'ບັນທຶກບົດສະຫຼຸບສຳເລັດແລ້ວ!', 'ok');
     } catch (error) {
       setStatus('saveSumStatus', 'ບັນທຶກບໍ່ສຳເລັດ: ' + error.message, 'err');
     } finally {
@@ -744,8 +749,13 @@
 
     editingSummaryId = s.id;
     $('summaryTitle').value = s.title || '';
-    $('result').value = s.text || '';
-    if ($('sumDept')) $('sumDept').value = s.department || '';
+    currentSummaryBundle = {
+      overall: s.text || '',
+      byDept: s.byDept || (s.department ? { [s.department]: s.text || '' } : {})
+    };
+    activeViewScope = '';
+    refreshViewScopeSelect();
+    $('result').value = currentSummaryBundle.overall;
     if (s.year) $('sumYear').value = s.year;
     if (s.period) $('period').value = String(s.period);
     if (s.startMonth) $('startMonth').value = String(s.startMonth);
@@ -893,12 +903,34 @@
       if (curFilter) $('filterDept').value = curFilter;
     }
 
-    if ($('sumDept')) {
-      const curSum = $('sumDept').value;
-      $('sumDept').innerHTML =
-        '<option value="">1. ບົດລວມຂອງພະແນກ (ທຸກຂະແໜງການ / ສູນ)</option>' +
-        allDepts.map(d => `<option value="${esc(d)}">2. ສະເພາະ: ${esc(d)}</option>`).join('');
-      if (curSum) $('sumDept').value = curSum;
+    refreshViewScopeSelect();
+  }
+
+  function syncCurrentEditorToBundle() {
+    const val = $('result')?.value || '';
+    if (activeViewScope) {
+      currentSummaryBundle.byDept[activeViewScope] = val;
+    } else {
+      currentSummaryBundle.overall = val;
+    }
+  }
+
+  function refreshViewScopeSelect() {
+    const sel = $('viewSummaryScope');
+    if (!sel) return;
+    const readyDepts = DEPARTMENTS.filter(d => currentSummaryBundle.byDept && currentSummaryBundle.byDept[d]);
+    const otherDepts = Object.keys(currentSummaryBundle.byDept || {}).filter(d => !DEPARTMENTS.includes(d) && currentSummaryBundle.byDept[d]);
+    const allReady = [...readyDepts, ...otherDepts];
+
+    sel.innerHTML =
+      `<option value="">ບົດລວມຂອງພະແນກ (${allReady.length ? `ລວມ ${allReady.length} ພາກສ່ວນ` : 'ທຸກຂະແໜງການ / ສູນ'})</option>` +
+      allReady.map((d, i) => `<option value="${esc(d)}">${i + 1}. ບົດສະຫຼຸບຂອງ: ${esc(d)}</option>`).join('');
+
+    if (activeViewScope && allReady.includes(activeViewScope)) {
+      sel.value = activeViewScope;
+    } else {
+      activeViewScope = '';
+      sel.value = '';
     }
   }
 
@@ -986,30 +1018,20 @@
 
   function getSelectedRecords() {
     const { months } = getSelectedRange();
-    const targetDept = ($('sumDept')?.value || '').trim();
     return records
-      .filter(r => {
-        const matchTime = months.some(m => m.year === r.year && m.month === r.month);
-        if (!matchTime) return false;
-        if (targetDept && (r.department || '').trim() !== targetDept) return false;
-        return true;
-      })
+      .filter(r => months.some(m => m.year === r.year && m.month === r.month))
       .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week || 0) - Number(b.week || 0));
   }
 
   function updateStats() {
     if (!$('stats')) return;
     const { n } = getSelectedRange();
-    const targetDept = ($('sumDept')?.value || '').trim();
     const rs = getSelectedRecords();
     const submittedDepts = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean)).size;
     const totalChars = rs.reduce((sum, r) => sum + r.text.length, 0).toLocaleString();
-    const deptStatHtml = targetDept
-      ? `<div class="stat"><b>1</b> ພາກສ່ວນທີ່ເລືອກ</div>`
-      : `<div class="stat"><b>${submittedDepts}/${DEPARTMENTS.length}</b> ພາກສ່ວນທີ່ມີບົດ</div>`;
 
     $('stats').innerHTML = `
-      ${deptStatHtml}
+      <div class="stat"><b>${submittedDepts}/${DEPARTMENTS.length}</b> ພາກສ່ວນທີ່ມີບົດ</div>
       <div class="stat"><b>${rs.length}</b> ບົດລາຍງານ</div>
       <div class="stat"><b>${n}</b> ເດືອນ</div>
       <div class="stat"><b>${totalChars}</b> ຕົວອັກສອນ</div>
@@ -1023,47 +1045,53 @@
     return n === 1 ? 'ປະຈຳເດືອນ' : `${n} ເດືອນ`;
   }
 
-  function buildPrompt(rs) {
+  function buildSingleDeptPrompt(dept, items) {
     const { y, n, start, months } = getSelectedRange();
     const end = months[months.length - 1];
     const style = $('style').value;
-    const targetDept = ($('sumDept')?.value || '').trim();
-
     const styleMap = {
       concise: 'ຂຽນໃຫ້ກະຊັບ ແຕ່ຄົບປະເດັນ.',
       detailed: 'ຂຽນລະອຽດ ຈັດໝວດວຽກງານ ແລະ ຮັກສາລາຍລະອຽດສຳຄັນ.',
       official: 'ໃຊ້ສຳນວນພາສາລາຊະການທາງການ ສຸພາບ ແລະ ໜັກແໜ້ນ.'
     };
 
-    if (targetDept) {
-      const body = rs.map(r => {
-        const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
-        const timeTag = isMonthly
-          ? `ລາຍງານປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}`
-          : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
-        return `[${timeTag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
-      }).join('\n\n');
+    const body = items.map(r => {
+      const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
+      const timeTag = isMonthly
+        ? `ລາຍງານປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}`
+        : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
+      return `[${timeTag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
+    }).join('\n\n');
 
-      return [
-        `ຈົ່ງສັງເຄາະບົດລາຍງານທັງໝົດຂອງ "${targetDept}" ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${targetDept}" ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}). ${styleMap[style]}`,
-        '',
-        'ຫຼັກການສັງເຄາະ:',
-        `1. ຫົວບົດ ແລະ ພາບລວມໃຫ້ຂຽນໃນນາມ "${targetDept}" (ຂຶ້ນກັບພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ) ແລ້ວຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື:`,
-        '   - ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ (ສັງເຄາະລວມເນື້ອໃນຈາກທຸກອາທິດ/ເດືອນເຂົ້າກັນ ຈັດລຽງເປັນຂໍ້ໆຕາມໜ້າວຽກໃຫ້ຊັດເຈນ, ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ).',
-        '   - ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ (ສັງລວມຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄ້າງຂອງພາກສ່ວນ).',
-        '   - ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ (ສັງລວມທິດທາງແຜນການຈຸດສຸມໃນໄລຍະຕໍ່ໄປ ໂດຍຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ).',
-        '2. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ ຫຼື ເຫດການທີ່ບໍ່ມີໃນຂໍ້ມູນຕົ້ນສະບັບ.',
-        '3. ຂຽນໃຫ້ຈົບຄົບຖ້ວນທັງ 3 ພາກ ດ້ວຍພາສາລາວທາງການ 100%, ຫ້າມປົນຕົວອັກສອນພາສາໄທ ຫຼື ພາສາຂະແມ ແລະ ຫ້າມຂຽນຄຳແປໃນວົງເລັບ.',
-        '4. ຕອບເປັນຂໍ້ຄວາມທຳມະດາ (Plain Text) ເທົ່ານັ້ນ, ຫ້າມໃຊ້ສັນຍາລັກ Markdown ເຊັ່ນ **, ###, --- ຫຼື __ ຢ່າງເດັດຂາດ.',
-        '',
-        `ຂໍ້ມູນຕົ້ນສະບັບຂອງ ${targetDept}:`,
-        body
-      ].join('\n');
-    }
+    return [
+      `ຈົ່ງສັງເຄາະບົດລາຍງານທັງໝົດຂອງ "${dept}" ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${dept}" ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}). ${styleMap[style]}`,
+      '',
+      'ຫຼັກການສັງເຄາະ:',
+      `1. ຫົວບົດໃຫ້ຂຽນໃນນາມ "${dept}" ແລ້ວຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື:`,
+      '   - ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ (ສັງເຄາະລວມເນື້ອໃນຈາກທຸກອາທິດ/ເດືອນເຂົ້າກັນ ຈັດລຽງເປັນຂໍ້ໆຕາມໜ້າວຽກໃຫ້ຊັດເຈນ, ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ).',
+      '   - ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ (ຖ້າບໍ່ມີໃຫ້ຂຽນວ່າ: - ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງທີ່ລະບຸໄວ້).',
+      '   - ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ (ສັງລວມທິດທາງແຜນການຈຸດສຸມໃນໄລຍະຕໍ່ໄປ).',
+      '2. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ ຫຼື ເຫດການທີ່ບໍ່ມີໃນຂໍ້ມູນຕົ້ນສະບັບ.',
+      '3. ຂຽນໃຫ້ຈົບຄົບຖ້ວນທັງ 3 ພາກ ດ້ວຍພາສາລາວທາງການ 100%, ຫ້າມປົນຕົວອັກສອນພາສາໄທ ຫຼື ພາສາຂະແມ ແລະ ຫ້າມຂຽນຄຳແປໃນວົງເລັບ.',
+      '4. ຕອບເປັນຂໍ້ຄວາມທຳມະດາ (Plain Text) ເທົ່ານັ້ນ, ຫ້າມໃຊ້ສັນຍາລັກ Markdown ເຊັ່ນ **, ###, --- ຫຼື __ ຢ່າງເດັດຂາດ.',
+      '',
+      `ຂໍ້ມູນຕົ້ນສະບັບຂອງ ${dept}:`,
+      body
+    ].join('\n');
+  }
+
+  function buildPrompt(rs) {
+    const { y, n, start, months } = getSelectedRange();
+    const end = months[months.length - 1];
+    const style = $('style').value;
+    const styleMap = {
+      concise: 'ຂຽນໃຫ້ກະຊັບ ແຕ່ຄົບປະເດັນ.',
+      detailed: 'ຂຽນລະອຽດ ຈັດໝວດວຽກງານ ແລະ ຮັກສາລາຍລະອຽດສຳຄັນ.',
+      official: 'ໃຊ້ສຳນວນພາສາລາຊະການທາງການ ສຸພາບ ແລະ ໜັກແໜ້ນ.'
+    };
 
     const allDepts = getAllDepartments();
     const activeDepts = allDepts.filter(d => rs.some(r => (r.department || '').trim() === d));
-    const missingDepts = allDepts.filter(d => !activeDepts.includes(d));
 
     const groupedByDept = activeDepts.map((dept, idx) => {
       const items = rs.filter(r => (r.department || '').trim() === dept);
@@ -1077,28 +1105,60 @@
       return `\n=== ${idx + 1}. ${dept} ===\n${body}`;
     }).join('\n');
 
-    const ungrouped = rs.filter(r => !DEPARTMENTS.includes((r.department || '').trim()));
-    const ungroupedText = ungrouped.length
-      ? `\n=== ພາກສ່ວນອື່ນໆ ===\n` + ungrouped.map(r => `[${MONTHS[r.month - 1]} ${r.year}]\n${r.text}`).join('\n\n')
-      : '';
-
     return [
       `ຈົ່ງສັງເຄາະບົດລາຍງານຈາກບັນດາຂະແໜງການ, ສູນ ແລະ ຫ້ອງການ ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ" ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}). ${styleMap[style]}`,
-      `ພາກສ່ວນທີ່ສົ່ງຂໍ້ມູນເຂົ້າສັງລວມ (${activeDepts.length} ພາກສ່ວນ): ${activeDepts.join(', ') || 'ບໍ່ມີ'}.`,
-      missingDepts.length ? `ໝາຍເຫດ: ສະຫຼຸບສະເພາະຂໍ້ມູນຂອງພາກສ່ວນທີ່ສົ່ງມາຂ້າງລຸ່ມນີ້ເທົ່ານັ້ນ ຫ້າມແຕ່ງຂໍ້ມູນໃສ່ແທນພາກສ່ວນທີ່ຍັງບໍ່ສົ່ງ.` : '',
+      'ຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື: ພາກທີ I (ຜົນການຈັດຕັ້ງປະຕິບັດແຍກຕາມຂະແໜງການ/ສູນ), ພາກທີ II (ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກຄົງຄ້າງ) ແລະ ພາກທີ III (ທິດທາງແຜນການໃນຕໍ່ໜ້າ). ຫ້າມແຕ່ງຂໍ້ມູນເພີ່ມ.',
+      groupedByDept
+    ].join('\n');
+  }
+
+  function splitThreeParts(deptSummaryText) {
+    const p1 = [], p2 = [], p3 = [];
+    let sec = 0;
+    String(deptSummaryText || '').split(/\n+/).map(l => l.trim()).filter(Boolean).forEach(line => {
+      if (/^ບົດສະຫຼຸບ/.test(line)) return;
+      if (/^ພາກທີ\s*I\b/i.test(line)) { sec = 1; return; }
+      if (/^ພາກທີ\s*II\b/i.test(line)) { sec = 2; return; }
+      if (/^ພາກທີ\s*III\b/i.test(line)) { sec = 3; return; }
+      if (sec === 2) p2.push(line);
+      else if (sec === 3) p3.push(line);
+      else p1.push(line);
+    });
+    return { p1, p2, p3 };
+  }
+
+  function assembleOverallFromDepts(byDept) {
+    const { y, n, start, months } = getSelectedRange();
+    const endMonth = MONTHS[months[months.length - 1].month - 1];
+    const orderedDepts = [
+      ...DEPARTMENTS.filter(d => byDept[d]),
+      ...Object.keys(byDept).filter(d => !DEPARTMENTS.includes(d) && byDept[d])
+    ];
+
+    const part1List = [];
+    const part2List = [];
+    const part3List = [];
+
+    orderedDepts.forEach((dept, i) => {
+      const { p1, p2, p3 } = splitThreeParts(byDept[dept]);
+      if (p1.length) part1List.push(`${i + 1}. ${dept}\n${p1.join('\n')}`);
+      const validP2 = p2.filter(l => !/ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງ/.test(l));
+      if (validP2.length) part2List.push(`${dept}:\n${validP2.join('\n')}`);
+      if (p3.length) part3List.push(`${dept}:\n${p3.join('\n')}`);
+    });
+
+    return [
+      `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`,
       '',
-      'ຫຼັກການສັງເຄາະ:',
-      '1. ຫົວບົດ ແລະ ພາບລວມໃຫ້ຂຽນໃນນາມ "ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ" ແລ້ວຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື:',
-      '   - ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ (ໃຫ້ຈັດລຽງເປັນຂໍ້ຍ່ອຍແຍກຕາມຊື່ ຂະແໜງການ / ສູນ / ຫ້ອງການ ຢ່າງຊັດເຈນ ເຊັ່ນ: 1. ຂະແໜງ..., 2. ຂະແໜງ..., 3. ສູນ...; ພາຍໃນແຕ່ລະຂະແໜງ/ສູນ ໃຫ້ສັງເຄາະລວມເນື້ອໃນຈາກທຸກອາທິດ/ເດືອນເຂົ້າກັນ ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ).',
-      '   - ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ (ສັງລວມຈາກໝວດວຽກທີ່ຍັງຄ້າງ ໂດຍແຍກຕາມຂະແໜງການ/ສູນ ທີ່ກ່ຽວຂ້ອງ).',
-      '   - ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ (ສັງລວມຈາກໝວດທິດທາງແຜນການຂອງແຕ່ລະເດືອນ ໂດຍແຍກຕາມຂະແໜງການ/ສູນ ແລະ ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ).',
-      '2. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ ຫຼື ເຫດການທີ່ບໍ່ມີໃນຂໍ້ມູນຕົ້ນສະບັບ.',
-      '3. ຂຽນໃຫ້ຈົບຄົບຖ້ວນທັງ 3 ພາກ ດ້ວຍພາສາລາວທາງການ 100%, ຫ້າມປົນຕົວອັກສອນພາສາໄທ ຫຼື ພາສາຂະແມ ແລະ ຫ້າມຂຽນຄຳແປໃນວົງເລັບ.',
-      '4. ຕອບເປັນຂໍ້ຄວາມທຳມະດາ (Plain Text) ເທົ່ານັ້ນ, ຫ້າມໃຊ້ສັນຍາລັກ Markdown ເຊັ່ນ **, ###, --- ຫຼື __ ຢ່າງເດັດຂາດ.',
+      'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ',
+      part1List.join('\n\n') || '- ບໍ່ມີຂໍ້ມູນ',
       '',
-      'ຂໍ້ມູນຕົ້ນສະບັບແຍກຕາມພາກສ່ວນ:',
-      groupedByDept + ungroupedText
-    ].filter(Boolean).join('\n');
+      'ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ',
+      part2List.join('\n\n') || '- ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງທີ່ລະບຸໄວ້',
+      '',
+      'ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ',
+      part3List.join('\n\n') || '- ສືບຕໍ່ຈັດຕັ້ງປະຕິບັດແຜນວຽກຈຸດສຸມໃນໄລຍະຕໍ່ໄປໃຫ້ສຳເລັດຕາມຄາດໝາຍ'
+    ].join('\n');
   }
 
   function isSimilarLao(a, b) {
@@ -1118,89 +1178,74 @@
     return (same / Math.min(gx.size, gy.size)) >= 0.72;
   }
 
-  function fallbackSummary(rs) {
+  function buildSingleDeptFallback(rs, dept) {
     const { y, n, start, months } = getSelectedRange();
     const endMonth = MONTHS[months[months.length - 1].month - 1];
-    const targetDept = ($('sumDept')?.value || '').trim();
-    const allDepts = targetDept ? [targetDept] : getAllDepartments();
-    let idx = 0;
-    const part1List = [];
-    const part2List = [];
-    const part3List = [];
+    const items = rs.filter(r => (r.department || '').trim() === dept);
+    const accepted = [];
+    const p1 = [], p2 = [], p3 = [];
 
-    allDepts.forEach(dept => {
-      const items = rs.filter(r => (r.department || '').trim() === dept);
-      if (!items.length) return;
-      idx++;
-
-      const accepted = [];
-      const p1 = [], p2 = [], p3 = [];
+    items.forEach(r => {
       let section = 1;
+      r.text.split(/\n+/).map(l => l.trim()).filter(Boolean).forEach(line => {
+        if (/^(ພາກທີ\s*II|II\.|2\.|•?\s*(ຂໍ້ສະດວກ|ຂໍ້ຫຍຸ້ງຍາກ|ວຽກທີ່ຍັງຄົງຄ້າງ|ວຽກຄົງຄ້າງ))/i.test(line)) {
+          section = 2; return;
+        }
+        if (/^(ພາກທີ\s*III|III\.|3\.|•?\s*(ທິດທາງ|ແຜນການໃນຕໍ່ໜ້າ|ແຜນວຽກຈຸດສຸມ))/i.test(line)) {
+          section = 3; return;
+        }
+        if (/^(ພາກທີ\s*I|I\.|1\.|•?\s*ຜົນການຈັດຕັ້ງປະຕິບັດ)/i.test(line)) {
+          section = 1; return;
+        }
 
-      items.forEach(r => {
-        section = 1;
-        r.text.split(/\n+/).map(l => l.trim()).filter(Boolean).forEach(line => {
-          if (/^(ພາກທີ\s*II|II\.|2\.|•?\s*(ຂໍ້ສະດວກ|ຂໍ້ຫຍຸ້ງຍາກ|ວຽກທີ່ຍັງຄົງຄ້າງ|ວຽກຄົງຄ້າງ))/i.test(line)) {
-            section = 2; return;
-          }
-          if (/^(ພາກທີ\s*III|III\.|3\.|•?\s*(ທິດທາງ|ແຜນການໃນຕໍ່ໜ້າ|ແຜນວຽກຈຸດສຸມ))/i.test(line)) {
-            section = 3; return;
-          }
-          if (/^(ພາກທີ\s*I|I\.|1\.|•?\s*ຜົນການຈັດຕັ້ງປະຕິບັດ)/i.test(line)) {
-            section = 1; return;
-          }
+        const norm = line.replace(/^[-•*0-9.]+\s*/, '').trim();
+        if (norm.length < 4) return;
+        if (accepted.some(prev => isSimilarLao(prev, norm))) return;
+        accepted.push(norm);
 
-          const norm = line.replace(/^[-•*0-9.]+\s*/, '').trim();
-          if (norm.length < 4) return;
-          if (accepted.some(prev => isSimilarLao(prev, norm))) return;
-          accepted.push(norm);
+        let targetSec = section;
+        if (targetSec === 1) {
+          if (/(ຂໍ້ຫຍຸ້ງຍາກ|ຍັງຄົງຄ້າງ|ບໍ່ທັນສຳເລັດ|ຊັກຊ້າ|ຂາດເຂີນ|ບໍ່ພຽງພໍ)/.test(norm)) targetSec = 2;
+          else if (/(ທິດທາງ|ແຜນການໃນຕໍ່ໜ້າ|ສືບຕໍ່ຈັດຕັ້ງ|ກະກຽມ|ຈະຈັດ|ໃນເດືອນໜ້າ)/.test(norm)) targetSec = 3;
+        }
 
-          let targetSec = section;
-          if (targetSec === 1) {
-            if (/(ຂໍ້ຫຍຸ້ງຍາກ|ຍັງຄົງຄ້າງ|ບໍ່ທັນສຳເລັດ|ຊັກຊ້າ|ຂາດເຂີນ|ບໍ່ພຽງພໍ)/.test(norm)) targetSec = 2;
-            else if (/(ທິດທາງ|ແຜນການໃນຕໍ່ໜ້າ|ສືບຕໍ່ຈັດຕັ້ງ|ກະກຽມ|ຈະຈັດ|ໃນເດືອນໜ້າ)/.test(norm)) targetSec = 3;
-          }
-
-          const bullet = `- ${norm}`;
-          if (targetSec === 2) p2.push(bullet);
-          else if (targetSec === 3) p3.push(bullet);
-          else p1.push(bullet);
-        });
+        const bullet = `- ${norm}`;
+        if (targetSec === 2) p2.push(bullet);
+        else if (targetSec === 3) p3.push(bullet);
+        else p1.push(bullet);
       });
-
-      if (targetDept) {
-        part1List.push(...p1);
-        part2List.push(...p2);
-        part3List.push(...p3);
-      } else {
-        if (p1.length) part1List.push(`${idx}. ${dept}\n${p1.join('\n')}`);
-        if (p2.length) part2List.push(`${dept}:\n${p2.join('\n')}`);
-        if (p3.length) part3List.push(`${dept}:\n${p3.join('\n')}`);
-      }
     });
 
-    const mainHeader = targetDept
-      ? `ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${targetDept} ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`
-      : `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`;
-
-    const part1Title = targetDept
-      ? 'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ'
-      : 'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ';
-
-    const sep = targetDept ? '\n' : '\n\n';
-
     return [
-      mainHeader,
+      `ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${dept} ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`,
       '',
-      part1Title,
-      part1List.join(sep) || '- ບໍ່ມີຂໍ້ມູນ',
+      'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ',
+      p1.join('\n') || '- ບໍ່ມີຂໍ້ມູນ',
       '',
       'ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ',
-      part2List.join(sep) || '- ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງທີ່ລະບຸໄວ້',
+      p2.join('\n') || '- ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງທີ່ລະບຸໄວ້',
       '',
       'ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ',
-      part3List.join(sep) || '- ສືບຕໍ່ຈັດຕັ້ງປະຕິບັດແຜນວຽກຈຸດສຸມໃນໄລຍະຕໍ່ໄປໃຫ້ສຳເລັດຕາມຄາດໝາຍ'
+      p3.join('\n') || '- ສືບຕໍ່ຈັດຕັ້ງປະຕິບັດແຜນວຽກຈຸດສຸມໃນໄລຍະຕໍ່ໄປໃຫ້ສຳເລັດຕາມຄາດໝາຍ'
     ].join('\n');
+  }
+
+  function buildAllOfflineSummaries(rs) {
+    const deptSet = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean));
+    const activeDepts = [
+      ...DEPARTMENTS.filter(d => deptSet.has(d)),
+      ...[...deptSet].filter(d => !DEPARTMENTS.includes(d))
+    ];
+    const byDept = {};
+    activeDepts.forEach(dept => {
+      byDept[dept] = cleanOutput(buildSingleDeptFallback(rs, dept));
+    });
+    const overall = cleanOutput(assembleOverallFromDepts(byDept));
+    return { overall, byDept };
+  }
+
+  function fallbackSummary(rs) {
+    return buildAllOfflineSummaries(rs).overall;
   }
 
   window.useStructuredFallback = function () {
@@ -1511,10 +1556,19 @@
   $('filterDept').onchange = renderWeekList;
   $('searchReport').oninput = renderWeekList;
   $('reportType').onchange = toggleWeekInput;
-  $('sumDept').onchange = updateStats;
   $('sumYear').onchange = updateStats;
   $('period').onchange = updateStats;
   $('startMonth').onchange = updateStats;
+
+  $('result').oninput = syncCurrentEditorToBundle;
+
+  $('viewSummaryScope').onchange = () => {
+    syncCurrentEditorToBundle();
+    activeViewScope = $('viewSummaryScope').value;
+    $('result').value = activeViewScope
+      ? (currentSummaryBundle.byDept[activeViewScope] || '')
+      : (currentSummaryBundle.overall || '');
+  };
 
   $('generate').onclick = async () => {
     const rs = getSelectedRecords();
@@ -1533,87 +1587,76 @@
     showProgress();
     const tick = setInterval(() => showProgress(), 1000);
 
+    const deptSet = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean));
+    const activeDepts = [
+      ...DEPARTMENTS.filter(d => deptSet.has(d)),
+      ...[...deptSet].filter(d => !DEPARTMENTS.includes(d))
+    ];
+    const partialByDept = {};
+
     try {
       const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
-      if (cfg.key) $('result').value = '';
       let activeModel = $('model').value;
-      const totalChars = rs.reduce((s, r) => s + r.text.length, 0);
-      const deptGroups = [...new Set(rs.map(r => (r.department || '').trim()))];
-      let output = '';
 
       if (!cfg.key && !cfg.groqBackupKey) {
-        output = fallbackSummary(rs);
-      } else if (totalChars > 2600 && deptGroups.length > 1) {
-        // ແບ່ງສັງເຄາະທີລະຂະແໜງການ ເພື່ອບໍ່ໃຫ້ເກີນໂຄຕ້າ TPM ຂອງ Google Free Tier
-        const { y, n, start, months } = getSelectedRange();
-        const end = months[months.length - 1];
-        const part1Sections = [];
+        currentSummaryBundle = buildAllOfflineSummaries(rs);
+      } else {
+        for (let i = 0; i < activeDepts.length; i++) {
+          const deptLabel = activeDepts[i];
+          const deptItems = rs.filter(r => (r.department || '').trim() === deptLabel);
+          showProgress(`ກຳລັງສັງເຄາະພາກສ່ວນທີ ${i + 1}/${activeDepts.length}: ${deptLabel}...`);
 
-        for (let i = 0; i < deptGroups.length; i++) {
-          const deptName = deptGroups[i];
-          const deptLabel = deptName || 'ພາກສ່ວນອື່ນໆ';
-          const deptItems = rs.filter(r => (r.department || '').trim() === deptName);
-          const rawBody = deptItems.map(r => {
-            const isM = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
-            const tag = isM ? `ປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}` : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
-            return `[${tag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
-          }).join('\n\n');
-
-          showProgress(`ກຳລັງສັງເຄາະພາກສ່ວນທີ ${i + 1}/${deptGroups.length}: ${deptLabel}...`);
-          const miniPrompt = [
-            `ຈົ່ງສັງເຄາະບົດລາຍງານຂອງ "${deptLabel}" ໃຫ້ກະຊັບ ຊັດເຈນ ເປັນພາສາລາວທາງການ 100%, ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ. ຫ້າມແຕ່ງຂໍ້ມູນເພີ່ມ ແລະ ຫ້າມໃຊ້ສັນຍາລັກ Markdown (**, ###, ---).`,
-            `ຂຽນສະເພາະເນື້ອໃນຜົນການຈັດຕັ້ງປະຕິບັດ, ຂໍ້ຫຍຸ້ງຍາກ/ວຽກຄົງຄ້າງ ແລະ ທິດທາງແຜນການຂອງພາກສ່ວນນີ້ເທົ່ານັ້ນ:`,
-            rawBody
-          ].join('\n\n');
-
-          const secSummary = await callAI(miniPrompt, {
-            onProgress: msg => showProgress(`[${i + 1}/${deptGroups.length}] ${msg}`),
+          const deptOut = await callAI(buildSingleDeptPrompt(deptLabel, deptItems), {
+            onProgress: msg => showProgress(`[${i + 1}/${activeDepts.length}] ${msg}`),
             onModelUsed: m => { activeModel = m; },
             timeoutMs: 55000
           });
-          part1Sections.push(`${i + 1}. ${deptLabel}\n${cleanOutput(secSummary)}`);
-          $('result').value = part1Sections.join('\n\n');
-          if (i < deptGroups.length - 1) await new Promise(r => setTimeout(r, 1500));
-        }
 
-        output = [
-          `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y})`,
-          '',
-          'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ',
-          part1Sections.join('\n\n'),
-          '',
-          'ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ',
-          '- ສັງລວມຈາກວຽກທີ່ຍັງຄົງຄ້າງຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ ທີ່ໄດ້ລະບຸໄວ້ຂ້າງເທິງ.',
-          '',
-          'ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ',
-          '- ສືບຕໍ່ຈັດຕັ້ງປະຕິບັດແຜນວຽກຈຸດສຸມໃນໄລຍະຕໍ່ໄປຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ ໃຫ້ສຳເລັດຕາມຄາດໝາຍ.'
-        ].join('\n');
-      } else {
-        output = await callAI(buildPrompt(rs), {
-          onProgress: msg => showProgress(msg),
-          onModelUsed: m => { activeModel = m; },
-          onChunk: txt => {
-            $('result').value = txt.replace(/\*\*|#{1,6}\s?/g, '');
-            $('result').scrollTop = $('result').scrollHeight;
-            showProgress(`AI (${activeModel}) ກຳລັງຂຽນບົດສະຫຼຸບ...`);
-          },
-          timeoutMs: 25000
-        });
+          partialByDept[deptLabel] = cleanOutput(deptOut);
+          currentSummaryBundle = {
+            overall: cleanOutput(assembleOverallFromDepts(partialByDept)),
+            byDept: { ...partialByDept }
+          };
+          refreshViewScopeSelect();
+          $('result').value = activeViewScope
+            ? (currentSummaryBundle.byDept[activeViewScope] || currentSummaryBundle.overall)
+            : currentSummaryBundle.overall;
+
+          if (i < activeDepts.length - 1) await new Promise(r => setTimeout(r, 1200));
+        }
       }
-      $('result').value = cleanOutput(output);
+
+      refreshViewScopeSelect();
+      $('result').value = activeViewScope
+        ? (currentSummaryBundle.byDept[activeViewScope] || '')
+        : currentSummaryBundle.overall;
+
       const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
       setStatus(
         'genStatus',
-        cfg.key
-          ? `ສັງເຄາະດ້ວຍ AI (${activeModel}) ສຳເລັດໃນ ${totalSec} ວິນາທີ. ກະລຸນາກວດທານກ່ອນນຳໃຊ້.`
-          : 'ສ້າງຜົນລວມພື້ນຖານແລ້ວ (ຍັງບໍ່ໄດ້ໃຊ້ AI).',
+        (cfg.key || cfg.groqBackupKey)
+          ? `ສັງເຄາະດ້ວຍ AI (${activeModel}) ສຳເລັດທັງບົດລວມ ແລະ ${activeDepts.length} ພາກສ່ວນ ໃນ ${totalSec} ວິນາທີ.`
+          : `ສ້າງບົດລວມ ແລະ ບົດຍ່ອຍ ${activeDepts.length} ພາກສ່ວນສຳເລັດແລ້ວ (ໂໝດພື້ນຖານ).`,
         'ok'
       );
     } catch (e) {
-      $('result').value = cleanOutput(fallbackSummary(rs));
+      activeDepts.forEach(dept => {
+        if (!partialByDept[dept]) {
+          partialByDept[dept] = cleanOutput(buildSingleDeptFallback(rs, dept));
+        }
+      });
+      currentSummaryBundle = {
+        overall: cleanOutput(assembleOverallFromDepts(partialByDept)),
+        byDept: partialByDept
+      };
+      refreshViewScopeSelect();
+      $('result').value = activeViewScope
+        ? (currentSummaryBundle.byDept[activeViewScope] || '')
+        : currentSummaryBundle.overall;
+
       setStatus(
         'genStatus',
-        'ເຊີບເວີ AI ບໍ່ວ່າງ — ລະບົບຈຶ່ງສັງລວມ, ຕັດຂໍ້ຊ້ຳ ແລະ ຈັດໂຄງສ້າງ 3 ພາກໃຫ້ອັດຕະໂນມັດແລ້ວ (ສາມາດກວດແກ້ ຫຼື ດາວໂຫຼດ Word ໄດ້ເລີຍ).',
+        `ເຊີບເວີ AI ບໍ່ວ່າງ — ລະບົບຈຶ່ງສັງລວມທັງບົດລວມ ແລະ ບົດຍ່ອຍ ${activeDepts.length} ພາກສ່ວນໃຫ້ອັດຕະໂນມັດແລ້ວ.`,
         'ok'
       );
     } finally {
@@ -1627,8 +1670,14 @@
     if (!rs.length) {
       return setStatus('genStatus', 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.', 'err');
     }
-    $('result').value = cleanOutput(fallbackSummary(rs));
-    setStatus('genStatus', 'ສັງລວມ ແລະ ຈັດໂຄງສ້າງ 3 ພາກສຳເລັດທັນທີ (0.01 ວິນາທີ).', 'ok');
+    currentSummaryBundle = buildAllOfflineSummaries(rs);
+    refreshViewScopeSelect();
+    $('result').value = activeViewScope
+      ? (currentSummaryBundle.byDept[activeViewScope] || '')
+      : currentSummaryBundle.overall;
+
+    const deptCount = Object.keys(currentSummaryBundle.byDept).length;
+    setStatus('genStatus', `ສັງລວມທັງບົດລວມພະແນກ ແລະ ບົດຍ່ອຍ ${deptCount} ພາກສ່ວນສຳເລັດທັນທີ (ເລືອກສະຫຼັບເບິ່ງໄດ້ດ້ານລຸ່ມ).`, 'ok');
   };
 
   $('copyForWebAI').onclick = async () => {
@@ -1652,6 +1701,9 @@
 
   $('clearResult').onclick = () => {
     editingSummaryId = null;
+    currentSummaryBundle = { overall: '', byDept: {} };
+    activeViewScope = '';
+    refreshViewScopeSelect();
     $('summaryTitle').value = '';
     $('result').value = '';
     setStatus('genStatus', '');
@@ -1682,7 +1734,7 @@
 
     const { y, n, start, months } = getSelectedRange();
     const end = months[months.length - 1];
-    const targetDept = ($('sumDept')?.value || '').trim();
+    const targetDept = activeViewScope.trim();
     const periodTitle = n === 1
       ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
       : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
