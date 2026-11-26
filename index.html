@@ -1430,7 +1430,7 @@
     const r = records.find(x => x.id === id);
     if (!r) return;
     if (currentUser?.role === 'dept' && (r.department || '').trim() !== currentUser.department) {
-      return alert('ທ່ານມີສິດແກ້ໄຂສະເພາະບົດລາຍງານຂອງພາກສ່ວນຕົນເອງເທົ່ານັ້ນ');
+      return sysAlert({ title: 'ບໍ່ມີສິດເຂົ້າເຖິງ', message: 'ທ່ານມີສິດແກ້ໄຂສະເພາະບົດລາຍງານຂອງພາກສ່ວນຕົນເອງເທົ່ານັ້ນ' });
     }
 
     editingId = id;
@@ -1904,13 +1904,35 @@
     return cachedGeminiModels;
   }
 
+  function normalizeEndpoint(ep) {
+    const raw = String(ep || '').trim().replace(/\/+$/, '');
+    if (!raw) return 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    if (/^https:\/\/api\.groq\.com(\/openai(\/v1)?)?$/i.test(raw)) {
+      return 'https://api.groq.com/openai/v1/chat/completions';
+    }
+    return raw;
+  }
+
+  async function fetchOpenAIModels(endpoint, apiKey) {
+    const base = normalizeEndpoint(endpoint).replace(/\/chat\/completions$/i, '');
+    const res = await fetch(`${base}/models`, {
+      headers: { 'Authorization': 'Bearer ' + apiKey }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error?.message || ('API Error: ' + res.status));
+    return (data.data || [])
+      .map(m => m.id)
+      .filter(id => id && !/(whisper|tts|guard|embed|moderation|audio)/i.test(id))
+      .sort();
+  }
+
   async function callAI(prompt, { onProgress = null, onChunk = null, onModelUsed = null, timeoutMs = 60000, fastTest = false } = {}) {
     const cfg = JSON.parse(localStorage.getItem(CFG_KEY) || '{}');
     const keys = String(cfg.key || '').split(/[\n,]+/).map(k => k.trim()).filter(Boolean);
     const groqBackupKey = (cfg.groqBackupKey || '').trim();
     if (!keys.length && !groqBackupKey) throw new Error('ຍັງບໍ່ໄດ້ປ້ອນ API Key');
 
-    const endpoint = cfg.endpoint || 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+    const endpoint = normalizeEndpoint(cfg.endpoint);
     const primaryModel = (cfg.model || 'gemini-3.5-flash-lite').trim();
     const sysPrompt = fastTest
       ? 'ຕອບສັ້ນໆ ຕາມຄຳສັ່ງ.'
@@ -2060,6 +2082,7 @@
 
     let lastErr = '';
     let isQuotaExceeded = false;
+    let isAuthError = false;
     const attemptLogs = [];
     const deadQuotaSet = window.__deadQuotaModels || (window.__deadQuotaModels = new Set());
 
@@ -2091,6 +2114,12 @@
             if (r.ok) return { success: true, text: r.text };
 
             const msg = r.data?.error?.message || ('API Error: ' + r.status);
+            if (r.status === 401 || r.status === 403) {
+              isAuthError = true;
+              lastErr = msg;
+              attemptLogs.push(`${targetModel}: API Key ບໍ່ຖືກຕ້ອງ (${r.status})`);
+              return { success: false, status: r.status };
+            }
             if (r.status === 429 || /quota/i.test(msg)) {
               isQuotaExceeded = true;
               deadQuotaSet.add(qKey);
@@ -2115,6 +2144,7 @@
       // ລອງ Model ຫຼັກກ່ອນ
       const primaryRes = await tryModel(primaryModel, 2);
       if (primaryRes.success) return primaryRes.text;
+      if (primaryRes.status === 401 || primaryRes.status === 403) continue;
 
       // ຖ້າເປັນ Google Gemini ໃຫ້ສະຫຼັບໄປ Model ທີ່ຕອບໄວ ແລະ ໂຄຕ້າສູງ
       if (isGemini) {
@@ -2146,15 +2176,31 @@
             if (altRes.success) return altRes.text;
           }
         } catch (_) {}
+      } else {
+        // ຖ້າເປັນ Groq / OpenAI-Compatible ແລ້ວ Model ຫຼັກ 404 ໃຫ້ດຶງລາຍຊື່ Model ທີ່ມີຢູ່ຈິງມາລອງອັດຕະໂນມັດ
+        try {
+          onProgress?.(`ກຳລັງຄົ້ນຫາ Model ທີ່ໃຊ້ໄດ້ຈາກເຊີບເວີ${keyTag}...`);
+          const available = await fetchOpenAIModels(endpoint, apiKey);
+          const backups = available.filter(m => m !== primaryModel).slice(0, 4);
+          for (const alt of backups) {
+            const altRes = await tryModel(alt, 1);
+            if (altRes.success) return altRes.text;
+          }
+        } catch (_) {}
       }
     }
 
-    // 2. ຖ້າ Google AI ລົ້ມເຫຼວທັງໝົດ ແຕ່ມີ Groq Backup Key -> ສະຫຼັບໄປ Groq ອັດຕະໂນມັດທັນທີ!
+    // 2. ຖ້າ AI ຫຼັກລົ້ມເຫຼວ ແຕ່ມີ Groq Backup Key -> ດຶງ Model ຈາກ Groq ແລ້ວສະຫຼັບໄປໃຊ້ອັດຕະໂນມັດ
     if (groqBackupKey) {
       const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
-      const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+      let groqModels = ['llama-3.1-8b-instant'];
+      try {
+        const fetched = await fetchOpenAIModels(groqUrl, groqBackupKey);
+        if (fetched.length) groqModels = fetched.slice(0, 4);
+      } catch (_) {}
+
       for (const gm of groqModels) {
-        onProgress?.(`Google AI ບໍ່ວ່າງ — ກຳລັງສະຫຼັບໄປ Groq (${gm}) ອັດຕະໂນມັດ...`);
+        onProgress?.(`AI ຫຼັກບໍ່ວ່າງ — ກຳລັງສະຫຼັບໄປ Groq (${gm}) ອັດຕະໂນມັດ...`);
         onModelUsed?.(`Groq: ${gm}`);
         try {
           const r = await runComplete(p => sendOpenAI(groqUrl, gm, groqBackupKey, p), `Groq (${gm})`);
@@ -2167,6 +2213,9 @@
     }
 
     const summaryLog = [...new Set(attemptLogs)].join(', ');
+    if (isAuthError) {
+      throw new Error(`API Key ບໍ່ຖືກຕ້ອງ ຫຼື ບໍ່ກົງກັບລະບົບ AI ທີ່ເລືອກ (${summaryLog}) — ກະລຸນາລຶບ Key ເກົ່າໃນຊ່ອງ API Key ອອກໃຫ້ໝົດ ແລ້ວວາງລະຫັດ Groq (gsk_...) ທີ່ສ້າງໃໝ່`);
+    }
     if (isQuotaExceeded && !attemptLogs.some(l => l.includes('503'))) {
       throw new Error(`ໂຄຕ້າຟຣີຕໍ່ມື້ໝົດແລ້ວ (${summaryLog}) — ແນະນຳໃຫ້ໃສ່ Groq API Key ສຳຮອງໃນແຖບຕັ້ງຄ່າ AI`);
     }
@@ -2606,13 +2655,27 @@
   }
 
   $('saveSettings').onclick = () => {
+    const fixedEndpoint = normalizeEndpoint($('endpoint').value);
+    const cleanKey = $('apiKey').value.trim();
+    const cleanBackup = $('groqBackupKey').value.trim();
+    $('endpoint').value = fixedEndpoint;
+    $('apiKey').value = cleanKey;
+    $('groqBackupKey').value = cleanBackup;
+
     localStorage.setItem(CFG_KEY, JSON.stringify({
-      endpoint: $('endpoint').value.trim(),
-      key: $('apiKey').value.trim(),
-      groqBackupKey: $('groqBackupKey').value.trim(),
+      endpoint: fixedEndpoint,
+      key: cleanKey,
+      groqBackupKey: cleanBackup,
       model: $('model').value.trim(),
       systemPrompt: $('systemPrompt').value
     }));
+
+    if (fixedEndpoint.includes('api.groq.com') && cleanKey && !cleanKey.startsWith('gsk_')) {
+      return setStatus('aiStatus', 'ຄຳເຕືອນ: ທ່ານເລືອກໃຊ້ Groq ແຕ່ລະຫັດໃນຊ່ອງ API Key ບໍ່ແມ່ນລະຫັດ Groq (gsk_...) — ກະລຸນາລຶບລະຫັດເກົ່າອອກແລ້ວວາງລະຫັດ gsk_... ໃສ່ແທນ', 'err');
+    }
+    if (fixedEndpoint.includes('generativelanguage.googleapis.com') && cleanKey.startsWith('gsk_')) {
+      return setStatus('aiStatus', 'ຄຳເຕືອນ: ທ່ານເລືອກໃຊ້ Google Gemini ແຕ່ລະຫັດໃນຊ່ອງ API Key ເປັນຂອງ Groq (gsk_...) — ກະລຸນາກົດປຸ່ມ "ໃຊ້ Groq" ຫຼື ໃສ່ລະຫັດ Google (AIza...)', 'err');
+    }
     setStatus('aiStatus', 'ບັນທຶກການຕັ້ງຄ່າແລ້ວ', 'ok');
   };
 
@@ -2648,10 +2711,16 @@
   $('loadModels').onclick = async () => {
     const key = $('apiKey').value.split(/[\n,]+/)[0].trim();
     if (!key) return setStatus('aiStatus', 'ກະລຸນາວາງ API Key ກ່ອນ', 'err');
+    const fixedEndpoint = normalizeEndpoint($('endpoint').value);
+    $('endpoint').value = fixedEndpoint;
+    const isGemini = fixedEndpoint.includes('generativelanguage.googleapis.com');
+
     $('loadModels').disabled = true;
-    setStatus('aiStatus', 'ກຳລັງດຶງລາຍຊື່ Model ທີ່ໃຊ້ໄດ້ຈາກ Google...');
+    setStatus('aiStatus', `ກຳລັງດຶງລາຍຊື່ Model ທີ່ໃຊ້ໄດ້ຈາກ ${isGemini ? 'Google' : 'Groq / Server'}...`);
     try {
-      const list = await fetchGeminiModels(key);
+      const list = isGemini
+        ? await fetchGeminiModels(key)
+        : await fetchOpenAIModels(fixedEndpoint, key);
       if (!list.length) throw new Error('ບໍ່ພົບ Model ທີ່ຮອງຮັບ');
       $('modelPicker').innerHTML =
         '<option value="">-- ເລືອກ Model ທີ່ຕ້ອງການ --</option>' +
@@ -2686,19 +2755,35 @@
       const parsed = JSON.parse(await file.text());
       const incoming = Array.isArray(parsed) ? parsed : parsed.records;
       if (!Array.isArray(incoming)) throw new Error('ຮູບແບບໄຟລ໌ບໍ່ຖືກຕ້ອງ');
-      if (!confirm(`ນຳເຂົ້າ ${incoming.length} ລາຍການຂຶ້ນ Firebase?`)) return;
+      const ok = await sysConfirm({
+        title: 'ຢືນຢັນການນຳເຂົ້າຂໍ້ມູນ',
+        message: `ຕ້ອງການນຳເຂົ້າບົດລາຍງານຈຳນວນ ${incoming.length} ລາຍການ ຂຶ້ນຖານຂໍ້ມູນ Firebase?`,
+        confirmText: 'ນຳເຂົ້າຂໍ້ມູນ',
+        cancelText: 'ຍົກເລີກ',
+        type: 'question'
+      });
+      if (!ok) {
+        e.target.value = '';
+        return;
+      }
 
       setStatus('backupStatus', 'ກຳລັງອັບໂຫຼດຂໍ້ມູນຂຶ້ນ Firebase...');
-      const rows = incoming.map(r => ({
-        id: r.id || ('imp' + Date.now() + Math.random().toString(16).slice(2)),
-        year: Number(r.year),
-        month: Number(r.month),
-        week: String(r.week),
-        title: r.title || '',
-        department: r.department || '',
-        text: r.text || '',
-        updated: r.updated || new Date().toISOString()
-      }));
+      const rows = incoming.map(r => {
+        const rType = r.reportType || (r.week ? 'weekly' : 'monthly');
+        return {
+          id: r.id || ('imp' + Date.now() + Math.random().toString(16).slice(2)),
+          year: Number(r.year),
+          month: Number(r.month),
+          reportType: rType,
+          week: rType === 'monthly' ? '' : String(r.week || '1'),
+          title: r.title || '',
+          department: r.department || '',
+          text: r.text || '',
+          isSummarized: Boolean(r.isSummarized),
+          summarizedAt: r.summarizedAt || '',
+          updated: r.updated || new Date().toISOString()
+        };
+      });
 
       for (let i = 0; i < rows.length; i += 450) {
         const batch = db.batch();
@@ -2717,12 +2802,22 @@
   };
 
   $('deleteAll').onclick = async () => {
-    if (!confirm('ລຶບລາຍງານທັງໝົດອອກຈາກ Firebase ແທ້ບໍ? ຂໍ້ມູນຈະຫາຍໄປຈາກທຸກເຄື່ອງ!')) return;
+    const ok = await sysConfirm({
+      title: 'ລຶບບົດລາຍງານທັງໝົດ',
+      message: 'ຢືນຢັນລຶບບົດລາຍງານທັງໝົດອອກຈາກ Firebase ແທ້ບໍ?\n(ຂໍ້ມູນລາຍງານຈະຫາຍໄປຈາກທຸກເຄື່ອງ ແຕ່ຍັງຮັກສາບັນຊີຜູ້ໃຊ້ ແລະ ຄັງບົດສະຫຼຸບໄວ້)',
+      confirmText: 'ລຶບທັງໝົດ',
+      cancelText: 'ຍົກເລີກ',
+      type: 'danger'
+    });
+    if (!ok) return;
 
     setStatus('backupStatus', 'ກຳລັງລຶບຂໍ້ມູນທັງໝົດ...');
     try {
       const snap = await reportsCol.get();
-      const targetDocs = snap.docs.filter(doc => doc.data().recordKind !== 'saved_summary');
+      const targetDocs = snap.docs.filter(doc => {
+        const kind = doc.data().recordKind;
+        return kind !== 'saved_summary' && kind !== 'user_account';
+      });
       for (let i = 0; i < targetDocs.length; i += 450) {
         const batch = db.batch();
         targetDocs.slice(i, i + 450).forEach(doc => batch.delete(doc.ref));
@@ -2730,7 +2825,7 @@
       }
       records = [];
       renderWeekList();
-      setStatus('backupStatus', 'ລຶບຂໍ້ມູນທັງໝົດແລ້ວ', 'ok');
+      setStatus('backupStatus', 'ລຶບຂໍ້ມູນລາຍງານທັງໝົດແລ້ວ', 'ok');
     } catch (error) {
       setStatus('backupStatus', 'ຜິດພາດ: ' + error.message, 'err');
     }
