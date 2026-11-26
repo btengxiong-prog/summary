@@ -2697,15 +2697,22 @@
   };
 
   $('presetGemini').onclick = () => {
+    const curKey = $('apiKey').value.trim();
+    if (curKey.startsWith('gsk_')) localStorage.setItem('lao_ai_groq_key', curKey);
     $('endpoint').value = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
     $('model').value = 'gemini-3.8-flash';
-    setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Google Gemini 3.8 Flash ແລ້ວ — ວາງ API Key ແລ້ວກົດບັນທຶກ', 'ok');
+    $('apiKey').value = localStorage.getItem('lao_ai_gemini_key') || '';
+    setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Google Gemini ແລ້ວ — ວາງ Google API Key (AIza...) ແລ້ວກົດບັນທຶກ', 'ok');
   };
 
   $('presetGroq').onclick = () => {
+    const curKey = $('apiKey').value.trim();
+    if (curKey && !curKey.startsWith('gsk_')) localStorage.setItem('lao_ai_gemini_key', curKey);
     $('endpoint').value = 'https://api.groq.com/openai/v1/chat/completions';
     $('model').value = 'llama-3.3-70b-versatile';
-    setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Groq ແລ້ວ — ເອົາ API Key ຟຣີທີ່ console.groq.com ມາວາງ ແລ້ວກົດບັນທຶກ', 'ok');
+    const savedGroq = localStorage.getItem('lao_ai_groq_key') || $('groqBackupKey').value.trim();
+    $('apiKey').value = savedGroq;
+    setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Groq ແລ້ວ — ວາງ Groq API Key (gsk_...) ແລ້ວກົດບັນທຶກ', 'ok');
   };
 
   $('loadModels').onclick = async () => {
