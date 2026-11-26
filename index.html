@@ -796,6 +796,15 @@
         <select id="filterDept">
           <option value="">-- ທຸກຂະແໜງການ / ສູນ --</option>
         </select>
+        <select id="filterWeek">
+          <option value="">-- ທຸກອາທິດ / ປະຈຳເດືອນ --</option>
+          <option value="monthly">ສະເພາະລາຍງານປະຈຳເດືອນ</option>
+          <option value="1">ອາທິດທີ 1</option>
+          <option value="2">ອາທິດທີ 2</option>
+          <option value="3">ອາທິດທີ 3</option>
+          <option value="4">ອາທິດທີ 4</option>
+          <option value="5">ອາທິດທີ 5</option>
+        </select>
         <input id="searchReport" type="search" placeholder="ຄົ້ນຫາຫົວຂໍ້ ຫຼື ເນື້ອໃນ...">
       </div>
 
@@ -825,7 +834,8 @@
             <div>
               <label>ປະເພດລາຍງານ</label>
               <select id="period">
-                <option value="1">ປະຈຳເດືອນ</option>
+                <option value="weekly">ປະຈຳອາທິດ</option>
+                <option value="1" selected>ປະຈຳເດືອນ</option>
                 <option value="3">3 ເດືອນ</option>
                 <option value="6">6 ເດືອນ</option>
                 <option value="9">9 ເດືອນ</option>
@@ -836,7 +846,7 @@
 
           <div class="two">
             <div>
-              <label>ເລີ່ມແຕ່ເດືອນ</label>
+              <label id="startMonthLabel">ເລີ່ມແຕ່ເດືອນ</label>
               <select id="startMonth">
                 <option value="1">ມັງກອນ</option>
                 <option value="2">ກຸມພາ</option>
@@ -851,6 +861,16 @@
                 <option value="11">ພະຈິກ</option>
                 <option value="12">ທັນວາ</option>
               </select>
+              <div id="sumWeekGroup" class="hidden" style="margin-top:8px">
+                <label style="margin-top:0">ອາທິດທີ</label>
+                <select id="sumWeek">
+                  <option value="1">ອາທິດທີ 1</option>
+                  <option value="2">ອາທິດທີ 2</option>
+                  <option value="3">ອາທິດທີ 3</option>
+                  <option value="4">ອາທິດທີ 4</option>
+                  <option value="5">ອາທິດທີ 5</option>
+                </select>
+              </div>
             </div>
             <div>
               <label>ຮູບແບບການຂຽນ</label>
@@ -899,9 +919,64 @@
         <div class="card no-print">
           <div class="actions" style="justify-content:space-between; align-items:center; margin-top:0; margin-bottom:10px">
             <h2 style="margin:0">ຄັງບົດສະຫຼຸບທີ່ບັນທຶກ</h2>
-            <button type="button" class="secondary" id="refreshSummaries" style="padding:5px 10px; font-size:12px">ໂຫຼດໃໝ່</button>
+            <div style="display:flex; gap:6px; flex-wrap:wrap">
+              <button type="button" class="secondary" id="resetSumFilter" style="padding:5px 10px; font-size:12px">ລ້າງຕົວກັ່ນຕອງ</button>
+              <button type="button" class="secondary" id="refreshSummaries" style="padding:5px 10px; font-size:12px">ໂຫຼດໃໝ່</button>
+            </div>
           </div>
-          <input id="searchSavedSummary" type="search" placeholder="ຄົ້ນຫາຊື່ບົດສະຫຼຸບ ຫຼື ໄລຍະເວລາ..." style="margin-bottom:10px">
+
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:8px; margin-bottom:8px; background:#f4f8fd; padding:10px; border-radius:9px; border:1px solid var(--line)">
+            <div style="grid-column:span 2">
+              <select id="filterSumDept" style="padding:8px 9px; font-size:13px">
+                <option value="">-- ທຸກຂະແໜງການ / ສູນ / ຫ້ອງການ --</option>
+              </select>
+            </div>
+            <div>
+              <select id="filterSumYear" style="padding:8px 9px; font-size:13px">
+                <option value="">-- ທຸກປີ --</option>
+              </select>
+            </div>
+            <div>
+              <select id="filterSumMonth" style="padding:8px 9px; font-size:13px">
+                <option value="">-- ທຸກເດືອນ --</option>
+                <option value="1">ເດືອນ ມັງກອນ</option>
+                <option value="2">ເດືອນ ກຸມພາ</option>
+                <option value="3">ເດືອນ ມີນາ</option>
+                <option value="4">ເດືອນ ເມສາ</option>
+                <option value="5">ເດືອນ ພຶດສະພາ</option>
+                <option value="6">ເດືອນ ມິຖຸນາ</option>
+                <option value="7">ເດືອນ ກໍລະກົດ</option>
+                <option value="8">ເດືອນ ສິງຫາ</option>
+                <option value="9">ເດືອນ ກັນຍາ</option>
+                <option value="10">ເດືອນ ຕຸລາ</option>
+                <option value="11">ເດືອນ ພະຈິກ</option>
+                <option value="12">ເດືອນ ທັນວາ</option>
+              </select>
+            </div>
+            <div>
+              <select id="filterSumWeek" style="padding:8px 9px; font-size:13px">
+                <option value="">-- ທຸກອາທິດ --</option>
+                <option value="1">ອາທິດທີ 1</option>
+                <option value="2">ອາທິດທີ 2</option>
+                <option value="3">ອາທິດທີ 3</option>
+                <option value="4">ອາທິດທີ 4</option>
+                <option value="5">ອາທິດທີ 5</option>
+              </select>
+            </div>
+            <div>
+              <select id="filterSumPeriod" style="padding:8px 9px; font-size:13px">
+                <option value="">-- ທຸກປະເພດໄລຍະ --</option>
+                <option value="weekly">ປະຈຳອາທິດ</option>
+                <option value="1">ປະຈຳເດືອນ</option>
+                <option value="3">3 ເດືອນ</option>
+                <option value="6">6 ເດືອນ</option>
+                <option value="9">9 ເດືອນ</option>
+                <option value="12">12 ເດືອນ</option>
+              </select>
+            </div>
+          </div>
+
+          <input id="searchSavedSummary" type="search" placeholder="ຄົ້ນຫາຊື່ບົດສະຫຼຸບ, ຄຳສຳຄັນ ຫຼື ໄລຍະເວລາ..." style="margin-bottom:10px">
           <div id="savedSummaryList" style="display:flex; flex-direction:column; gap:8px; max-height:360px; overflow:auto"></div>
         </div>
       </section>
@@ -1221,31 +1296,81 @@
   function renderSavedSummaries() {
     const box = $('savedSummaryList');
     if (!box) return;
+
+    const yearSel = $('filterSumYear');
+    if (yearSel) {
+      const curY = yearSel.value;
+      const yearsSet = new Set([new Date().getFullYear(), ...savedSummaries.map(s => Number(s.year)).filter(Boolean)]);
+      const sortedYears = [...yearsSet].sort((a, b) => b - a);
+      yearSel.innerHTML = '<option value="">-- ທຸກປີ --</option>' +
+        sortedYears.map(y => `<option value="${y}">ປີ ${y}</option>`).join('');
+      if (curY && sortedYears.includes(Number(curY))) yearSel.value = curY;
+    }
+
+    const isDeptUser = currentUser?.role === 'dept';
+    const fDept = isDeptUser ? currentUser.department : ($('filterSumDept')?.value || '').trim();
+    const fYear = Number($('filterSumYear')?.value || 0);
+    const fMonth = Number($('filterSumMonth')?.value || 0);
+    const fPeriod = ($('filterSumPeriod')?.value || '').trim();
+    const fWeek = ($('filterSumWeek')?.value || '').trim();
     const kw = ($('searchSavedSummary')?.value || '').trim().toLowerCase();
+
     const list = savedSummaries.filter(s => {
-      if (currentUser?.role === 'dept' && s.department !== currentUser.department) return false;
-      if (!kw) return true;
-      return `${s.title || ''} ${s.periodLabel || ''} ${s.text || ''}`.toLowerCase().includes(kw);
+      if (fDept) {
+        const matchDept = s.department === fDept || Boolean(s.byDept && s.byDept[fDept]);
+        if (!matchDept) return false;
+      }
+      if (fYear && Number(s.year) !== fYear) return false;
+      if (fPeriod) {
+        if (fPeriod === 'weekly' && String(s.period) !== 'weekly') return false;
+        if (fPeriod !== 'weekly' && Number(s.period) !== Number(fPeriod)) return false;
+      }
+      if (fWeek) {
+        if (String(s.period) !== 'weekly' || String(s.week || '') !== fWeek) return false;
+      }
+      if (fMonth) {
+        const startM = Number(s.startMonth || 0);
+        const span = String(s.period) === 'weekly' ? 1 : Number(s.period || 1);
+        if (!startM) return false;
+        let inRange = false;
+        for (let i = 0; i < span; i++) {
+          if (((startM - 1 + i) % 12) + 1 === fMonth) { inRange = true; break; }
+        }
+        if (!inRange) return false;
+      }
+      if (kw) {
+        const deptText = (fDept && s.byDept && s.byDept[fDept]) ? s.byDept[fDept] : '';
+        const hay = `${s.title || ''} ${s.periodLabel || ''} ${s.text || ''} ${deptText}`.toLowerCase();
+        if (!hay.includes(kw)) return false;
+      }
+      return true;
     });
 
     if (!list.length) {
-      box.innerHTML = `<div class="small">${savedSummaries.length ? 'ບໍ່ພົບບົດສະຫຼຸບທີ່ຄົ້ນຫາ' : 'ຍັງບໍ່ມີບົດສະຫຼຸບທີ່ບັນທຶກໄວ້ໃນລະບົບ'}</div>`;
+      box.innerHTML = `<div class="small">${savedSummaries.length ? 'ບໍ່ພົບບົດສະຫຼຸບທີ່ກົງກັບເງື່ອນໄຂທີ່ເລືອກ' : 'ຍັງບໍ່ມີບົດສະຫຼຸບທີ່ບັນທຶກໄວ້ໃນລະບົບ'}</div>`;
       return;
     }
 
     box.innerHTML = list.map(s => {
       const dateStr = s.updated ? new Date(s.updated).toLocaleString('lo-LA') : '';
       const isEditing = s.id === editingSummaryId;
+      const hasSubDept = Boolean(fDept && s.byDept && s.byDept[fDept]);
+      const previewText = hasSubDept ? s.byDept[fDept] : (s.text || '');
+      const deptTag = hasSubDept
+        ? `<div style="display:inline-block; background:#e8f2fc; color:#1c5494; border:1px solid #c5dcf5; border-radius:5px; padding:1px 7px; font-size:11px; font-weight:600; margin:2px 0 4px;">ມີບົດສະຫຼຸບຂອງ: ${esc(fDept)}</div>`
+        : '';
+
       return `
         <div class="weekitem" style="${isEditing ? 'border-color:#2463a6; background:#f5f9ff;' : ''}">
           <div style="display:flex; justify-content:space-between; gap:8px; flex-wrap:wrap">
             <strong style="color:var(--navy); font-size:13px">${esc(s.title || 'ບົດສະຫຼຸບບໍ່ມີຊື່')}</strong>
             <span class="small">${esc(s.periodLabel || '')}</span>
           </div>
+          ${deptTag}
           <div class="small" style="margin:2px 0 4px">ບັນທຶກລ່າສຸດ: ${esc(dateStr)}</div>
-          <div style="color:#445566">${esc((s.text || '').slice(0, 120))}${(s.text || '').length > 120 ? '…' : ''}</div>
+          <div style="color:#445566">${esc(previewText.slice(0, 120))}${previewText.length > 120 ? '…' : ''}</div>
           <div style="margin-top:6px">
-            <button type="button" class="secondary" onclick="openSavedSummary('${s.id}')">ເປີດເບິ່ງ / ແກ້ໄຂ</button>
+            <button type="button" class="secondary" onclick="openSavedSummary('${s.id}', '${esc(fDept)}')">ເປີດເບິ່ງ / ແກ້ໄຂ</button>
             <button type="button" class="danger" onclick="deleteSavedSummary('${s.id}')">ລຶບ</button>
           </div>
         </div>
@@ -1260,13 +1385,12 @@
     }
 
     syncCurrentEditorToBundle();
-    const { y, n, start, months } = getSelectedRange();
-    const end = months[months.length - 1];
+    const range = getSelectedRange();
+    const { isWeekly, y, n, start, week } = range;
+    const rangeText = formatRangeTitle(range);
     const deptCount = Object.keys(currentSummaryBundle.byDept || {}).length;
     const scopeTag = deptCount ? `[ລວມພະແນກ + ${deptCount} ພາກສ່ວນ] ` : '[ລວມພະແນກ] ';
-    const periodLabel = scopeTag + (n === 1
-      ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ${y}`
-      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ${y})`);
+    const periodLabel = scopeTag + rangeText;
 
     const overallText = currentSummaryBundle.overall || text;
     const firstLine = overallText.split('\n').map(l => l.trim()).find(Boolean) || '';
@@ -1289,10 +1413,11 @@
       recordKind: 'saved_summary',
       department: currentUser?.role === 'dept' ? currentUser.department : '',
       year: y,
-      period: n,
+      period: isWeekly ? 'weekly' : n,
+      week: isWeekly ? week : '',
       startMonth: start,
       periodLabel: currentUser?.role === 'dept'
-        ? `[${currentUser.department}] ` + (n === 1 ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ${y}` : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ${y})`)
+        ? `[${currentUser.department}] ${rangeText}`
         : periodLabel,
       title,
       text: overallText,
@@ -1313,8 +1438,7 @@
     }
   }
 
-  
-      window.openSavedSummary = function (id) {
+  window.openSavedSummary = function (id, focusDept = '') {
     const s = savedSummaries.find(x => x.id === id);
     if (!s) return;
 
@@ -1323,16 +1447,24 @@
       overall: s.text || '',
       byDept: s.byDept || (s.department ? { [s.department]: s.text || '' } : {})
     };
-    activeViewScope = '';
+    activeViewScope = (focusDept && currentSummaryBundle.byDept[focusDept]) ? focusDept : '';
     refreshViewScopeSelect();
-    $('result').value = currentSummaryBundle.overall;
+    $('result').value = activeViewScope
+      ? currentSummaryBundle.byDept[activeViewScope]
+      : currentSummaryBundle.overall;
+
     if (s.year) $('sumYear').value = s.year;
-    if (s.period) $('period').value = String(s.period);
+    if (s.period) {
+      $('period').value = String(s.period);
+      toggleSumPeriodInput();
+    }
+    if (s.week && $('sumWeek')) $('sumWeek').value = String(s.week);
     if (s.startMonth) $('startMonth').value = String(s.startMonth);
     updateStats();
     renderSavedSummaries();
 
-    setStatus('saveSumStatus', `ກຳລັງເປີດເບິ່ງ: "${s.title}" (ສາມາດແກ້ໄຂ ຫຼື ດາວໂຫຼດ Word ໄດ້ເລີຍ)`, 'ok');
+    const scopeNote = activeViewScope ? ` · ພາກສ່ວນ: ${activeViewScope}` : '';
+    setStatus('saveSumStatus', `ກຳລັງເປີດເບິ່ງ: "${s.title}"${scopeNote} (ສາມາດແກ້ໄຂ ຫຼື ດາວໂຫຼດ Word ໄດ້ເລີຍ)`, 'ok');
     $('result').scrollIntoView({ behavior: 'smooth', block: 'center' });
   };
 
@@ -1503,6 +1635,15 @@
       $('filterDept').disabled = isDeptUser;
     }
 
+    if ($('filterSumDept')) {
+      const curSumFilter = isDeptUser ? currentUser.department : $('filterSumDept').value;
+      $('filterSumDept').innerHTML =
+        '<option value="">-- ທຸກຂະແໜງການ / ສູນ / ຫ້ອງການ --</option>' +
+        allDepts.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join('');
+      if (curSumFilter) $('filterSumDept').value = curSumFilter;
+      $('filterSumDept').disabled = isDeptUser;
+    }
+
     refreshViewScopeSelect();
   }
 
@@ -1544,6 +1685,7 @@
     const y = +$('year').value;
     const m = +$('month').value;
     const filterDept = ($('filterDept')?.value || '').trim();
+    const filterWeek = ($('filterWeek')?.value || '').trim();
     const keyword = ($('searchReport')?.value || '').trim().toLowerCase();
 
     const monthRecords = records.filter(r => r.year === y && r.month === m);
@@ -1570,6 +1712,11 @@
     const list = monthRecords
       .filter(r => {
         if (filterDept && (r.department || '').trim() !== filterDept) return false;
+        if (filterWeek) {
+          const rType = r.reportType || (r.week ? 'weekly' : 'monthly');
+          if (filterWeek === 'monthly' && rType !== 'monthly') return false;
+          if (filterWeek !== 'monthly' && (rType !== 'weekly' || String(r.week) !== filterWeek)) return false;
+        }
         if (keyword) {
           const hay = `${r.department || ''} ${r.title || ''} ${r.text || ''}`.toLowerCase();
           if (!hay.includes(keyword)) return false;
@@ -1606,25 +1753,49 @@
     updateStats();
   }
 
+  function toggleSumPeriodInput() {
+    const isWeekly = $('period')?.value === 'weekly';
+    if ($('sumWeekGroup')) $('sumWeekGroup').classList.toggle('hidden', !isWeekly);
+    if ($('startMonthLabel')) $('startMonthLabel').textContent = isWeekly ? 'ເດືອນ' : 'ເລີ່ມແຕ່ເດືອນ';
+  }
+
+  function formatRangeTitle({ isWeekly, y, n, start, week, months }) {
+    const end = months[months.length - 1];
+    if (isWeekly) {
+      return `ປະຈຳອາທິດທີ ${week} ເດືອນ ${MONTHS[start - 1]} ປີ ${y}`;
+    }
+    return n === 1
+      ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
+      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
+  }
+
   function getSelectedRange() {
     const y = +$('sumYear').value;
-    const n = +$('period').value;
+    const rawPeriod = $('period').value;
+    const isWeekly = rawPeriod === 'weekly';
+    const n = isWeekly ? 1 : +rawPeriod;
     const start = +$('startMonth').value;
+    const week = isWeekly ? String($('sumWeek')?.value || '1') : '';
     const months = [];
 
     for (let i = 0; i < n; i++) {
       const d = new Date(y, start - 1 + i, 1);
       months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
     }
-    return { y, n, start, months };
+    return { isWeekly, y, n, start, week, months };
   }
 
   function getSelectedRecords() {
-    const { months } = getSelectedRange();
+    const { isWeekly, week, months } = getSelectedRange();
     return records
       .filter(r => {
         if (currentUser?.role === 'dept' && (r.department || '').trim() !== currentUser.department) return false;
-        return months.some(m => m.year === r.year && m.month === r.month);
+        if (!months.some(m => m.year === r.year && m.month === r.month)) return false;
+        if (isWeekly) {
+          const rType = r.reportType || (r.week ? 'weekly' : 'monthly');
+          return rType === 'weekly' && String(r.week) === week;
+        }
+        return true;
       })
       .sort((a, b) => a.year - b.year || a.month - b.month || Number(a.week || 0) - Number(b.week || 0));
   }
@@ -1650,18 +1821,19 @@
 
   function updateStats() {
     if (!$('stats')) return;
-    const { n } = getSelectedRange();
+    const { isWeekly, n, week } = getSelectedRange();
     const allRs = getSelectedRecords();
     const newRs = allRs.filter(r => !r.isSummarized);
     const doneCount = allRs.length - newRs.length;
     const submittedDepts = new Set(allRs.map(r => (r.department || '').trim()).filter(Boolean)).size;
     const newChars = newRs.reduce((sum, r) => sum + r.text.length, 0).toLocaleString();
+    const rangeStat = isWeekly ? `<b>ອາທິດ ${esc(week)}</b> ປະຈຳເດືອນ` : `<b>${n}</b> ເດືອນ`;
 
     $('stats').innerHTML = `
       <div class="stat"><b>${submittedDepts}/${DEPARTMENTS.length}</b> ພາກສ່ວນທີ່ມີບົດ</div>
       <div class="stat"><b>${newRs.length}</b> ບົດໃໝ່ (ລໍຖ້າສັງລວມ)</div>
       <div class="stat"><b>${doneCount}</b> ບົດສັງລວມແລ້ວ</div>
-      <div class="stat"><b>${n}</b> ເດືອນ</div>
+      <div class="stat">${rangeStat}</div>
       <div class="stat"><b>${newChars}</b> ຕົວອັກສອນໃໝ່</div>
     `;
   }
@@ -1674,8 +1846,8 @@
   }
 
   function buildSingleDeptPrompt(dept, items) {
-    const { y, n, start, months } = getSelectedRange();
-    const end = months[months.length - 1];
+    const range = getSelectedRange();
+    const rangeText = formatRangeTitle(range);
     const style = $('style').value;
     const styleMap = {
       concise: 'ຂຽນໃຫ້ກະຊັບ ແຕ່ຄົບປະເດັນ.',
@@ -1692,7 +1864,7 @@
     }).join('\n\n');
 
     return [
-      `ຈົ່ງສັງເຄາະບົດລາຍງານທັງໝົດຂອງ "${dept}" ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${dept}" ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}). ${styleMap[style]}`,
+      `ຈົ່ງສັງເຄາະບົດລາຍງານທັງໝົດຂອງ "${dept}" ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${dept}" ${rangeText}. ${styleMap[style]}`,
       '',
       'ຫຼັກການສັງເຄາະ:',
       `1. ຫົວບົດໃຫ້ຂຽນໃນນາມ "${dept}" ແລ້ວຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື:`,
@@ -1709,8 +1881,8 @@
   }
 
   function buildPrompt(rs) {
-    const { y, n, start, months } = getSelectedRange();
-    const end = months[months.length - 1];
+    const range = getSelectedRange();
+    const rangeText = formatRangeTitle(range);
     const style = $('style').value;
     const styleMap = {
       concise: 'ຂຽນໃຫ້ກະຊັບ ແຕ່ຄົບປະເດັນ.',
@@ -1734,7 +1906,7 @@
     }).join('\n');
 
     return [
-      `ຈົ່ງສັງເຄາະບົດລາຍງານຈາກບັນດາຂະແໜງການ, ສູນ ແລະ ຫ້ອງການ ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ" ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${MONTHS[end.month - 1]} ${y}). ${styleMap[style]}`,
+      `ຈົ່ງສັງເຄາະບົດລາຍງານຈາກບັນດາຂະແໜງການ, ສູນ ແລະ ຫ້ອງການ ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ" ${rangeText}. ${styleMap[style]}`,
       'ຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື: ພາກທີ I (ຜົນການຈັດຕັ້ງປະຕິບັດແຍກຕາມຂະແໜງການ/ສູນ), ພາກທີ II (ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກຄົງຄ້າງ) ແລະ ພາກທີ III (ທິດທາງແຜນການໃນຕໍ່ໜ້າ). ຫ້າມແຕ່ງຂໍ້ມູນເພີ່ມ.',
       groupedByDept
     ].join('\n');
@@ -1756,8 +1928,7 @@
   }
 
   function assembleOverallFromDepts(byDept) {
-    const { y, n, start, months } = getSelectedRange();
-    const endMonth = MONTHS[months[months.length - 1].month - 1];
+    const rangeText = formatRangeTitle(getSelectedRange());
     const orderedDepts = [
       ...DEPARTMENTS.filter(d => byDept[d]),
       ...Object.keys(byDept).filter(d => !DEPARTMENTS.includes(d) && byDept[d])
@@ -1776,7 +1947,7 @@
     });
 
     return [
-      `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`,
+      `ບົດສະຫຼຸບລວມຂອງພະແນກສຶກສາທິການ ແລະ ກິລາ ແຂວງ ${rangeText}`,
       '',
       'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງແຕ່ລະຂະແໜງການ ແລະ ສູນ',
       part1List.join('\n\n') || '- ບໍ່ມີຂໍ້ມູນ',
@@ -1807,8 +1978,7 @@
   }
 
   function buildSingleDeptFallback(rs, dept) {
-    const { y, n, start, months } = getSelectedRange();
-    const endMonth = MONTHS[months[months.length - 1].month - 1];
+    const rangeText = formatRangeTitle(getSelectedRange());
     const items = rs.filter(r => (r.department || '').trim() === dept);
     const accepted = [];
     const p1 = [], p2 = [], p3 = [];
@@ -1845,7 +2015,7 @@
     });
 
     return [
-      `ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${dept} ປະຈຳ${periodName(n)} (${MONTHS[start - 1]} ຫາ ${endMonth} ${y})`,
+      `ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${dept} ${rangeText}`,
       '',
       'ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ',
       p1.join('\n') || '- ບໍ່ມີຂໍ້ມູນ',
@@ -2231,11 +2401,13 @@
   $('year').onchange = renderWeekList;
   $('month').onchange = renderWeekList;
   $('filterDept').onchange = renderWeekList;
+  $('filterWeek').onchange = renderWeekList;
   $('searchReport').oninput = renderWeekList;
   $('reportType').onchange = toggleWeekInput;
   $('sumYear').onchange = updateStats;
-  $('period').onchange = updateStats;
+  $('period').onchange = () => { toggleSumPeriodInput(); updateStats(); };
   $('startMonth').onchange = updateStats;
+  $('sumWeek').onchange = updateStats;
 
   $('result').oninput = syncCurrentEditorToBundle;
 
@@ -2408,6 +2580,20 @@
   $('saveSummary').onclick = saveCurrentSummary;
   $('refreshSummaries').onclick = loadSummaries;
   $('searchSavedSummary').oninput = renderSavedSummaries;
+  $('filterSumDept').onchange = renderSavedSummaries;
+  $('filterSumYear').onchange = renderSavedSummaries;
+  $('filterSumMonth').onchange = renderSavedSummaries;
+  $('filterSumPeriod').onchange = renderSavedSummaries;
+  $('filterSumWeek').onchange = renderSavedSummaries;
+  $('resetSumFilter').onclick = () => {
+    if (currentUser?.role !== 'dept') $('filterSumDept').value = '';
+    $('filterSumYear').value = '';
+    $('filterSumMonth').value = '';
+    $('filterSumPeriod').value = '';
+    $('filterSumWeek').value = '';
+    $('searchSavedSummary').value = '';
+    renderSavedSummaries();
+  };
 
   $('copy').onclick = async () => {
     if (!$('result').value) return;
@@ -2426,15 +2612,13 @@
     const content = $('result').value.trim();
     if (!content) return setStatus('genStatus', 'ຍັງບໍ່ມີເນື້ອໃນບົດສະຫຼຸບສຳລັບດາວໂຫຼດ', 'err');
 
-    const { y, n, start, months } = getSelectedRange();
-    const end = months[months.length - 1];
+    const range = getSelectedRange();
+    const { y } = range;
     const targetDept = currentUser?.role === 'dept'
       ? currentUser.department
       : activeViewScope.trim();
 
-    const periodTitle = n === 1
-      ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
-      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
+    const periodTitle = formatRangeTitle(range);
 
     const suffixCode = !targetDept ? 'ສກຂ.ຊຍ' : (/^ສູນ/.test(targetDept) ? 'ສນ' : (/^ຫ້ອງການ/.test(targetDept) ? 'ຫກ' : 'ຂໜ'));
     const docNoDisplay = `............/${suffixCode}`;
@@ -2986,6 +3170,7 @@
   initLoginDropdown();
   initDeptSelect();
   toggleWeekInput();
+  toggleSumPeriodInput();
   loadAISettings();
   loadRecords();
 
