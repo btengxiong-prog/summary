@@ -828,7 +828,7 @@
 
           <div class="two">
             <div>
-              <label>ປີ</label>
+              <label id="sumYearLabel">ປີ</label>
               <input id="sumYear" type="number">
             </div>
             <div>
@@ -839,7 +839,9 @@
                 <option value="3">3 ເດືອນ</option>
                 <option value="6">6 ເດືອນ</option>
                 <option value="9">9 ເດືອນ</option>
-                <option value="12">12 ເດືອນ</option>
+                <option value="12">12 ເດືອນ (1 ປີ)</option>
+                <option value="60">5 ປີ</option>
+                <option value="120">10 ປີ</option>
               </select>
             </div>
           </div>
@@ -971,7 +973,9 @@
                 <option value="3">3 ເດືອນ</option>
                 <option value="6">6 ເດືອນ</option>
                 <option value="9">9 ເດືອນ</option>
-                <option value="12">12 ເດືອນ</option>
+                <option value="12">12 ເດືອນ (1 ປີ)</option>
+                <option value="60">5 ປີ</option>
+                <option value="120">10 ປີ</option>
               </select>
             </div>
           </div>
@@ -1754,9 +1758,18 @@
   }
 
   function toggleSumPeriodInput() {
-    const isWeekly = $('period')?.value === 'weekly';
+    const val = $('period')?.value;
+    const isWeekly = val === 'weekly';
+    const isMultiYear = val === '60' || val === '120';
     if ($('sumWeekGroup')) $('sumWeekGroup').classList.toggle('hidden', !isWeekly);
-    if ($('startMonthLabel')) $('startMonthLabel').textContent = isWeekly ? 'ເດືອນ' : 'ເລີ່ມແຕ່ເດືອນ';
+    if ($('sumYearLabel')) {
+      $('sumYearLabel').textContent = isMultiYear ? 'ປີເລີ່ມຕົ້ນ (ປີທີ 1 ເຊັ່ນ: 2021)' : 'ປີ';
+    }
+    if ($('startMonthLabel')) {
+      $('startMonthLabel').textContent = isWeekly
+        ? 'ເດືອນ'
+        : (isMultiYear ? 'ເລີ່ມແຕ່ເດືອນ (ປົກກະຕິ: ມັງກອນ)' : 'ເລີ່ມແຕ່ເດືອນ');
+    }
   }
 
   function formatRangeTitle({ isWeekly, y, n, start, week, months }) {
@@ -1764,9 +1777,18 @@
     if (isWeekly) {
       return `ປະຈຳອາທິດທີ ${week} ເດືອນ ${MONTHS[start - 1]} ປີ ${y}`;
     }
-    return n === 1
-      ? `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`
-      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`;
+    if (n === 60 || n === 120) {
+      const yearsCount = n / 12;
+      return start === 1
+        ? `ປະຈຳ ${yearsCount} ປີ (${y} - ${end.year})`
+        : `ປະຈຳ ${yearsCount} ປີ (${MONTHS[start - 1]} ${y} - ${MONTHS[end.month - 1]} ${end.year})`;
+    }
+    if (n === 1) {
+      return `ປະຈຳເດືອນ ${MONTHS[start - 1]} ປີ ${y}`;
+    }
+    return start === 1 && end.year === y
+      ? `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} - ${MONTHS[end.month - 1]} ປີ ${y})`
+      : `ປະຈຳ ${n} ເດືອນ (${MONTHS[start - 1]} ${y} - ${MONTHS[end.month - 1]} ${end.year})`;
   }
 
   function getSelectedRange() {
@@ -1774,6 +1796,7 @@
     const rawPeriod = $('period').value;
     const isWeekly = rawPeriod === 'weekly';
     const n = isWeekly ? 1 : +rawPeriod;
+    const isMultiYear = !isWeekly && n >= 60;
     const start = +$('startMonth').value;
     const week = isWeekly ? String($('sumWeek')?.value || '1') : '';
     const months = [];
@@ -1782,7 +1805,7 @@
       const d = new Date(y, start - 1 + i, 1);
       months.push({ year: d.getFullYear(), month: d.getMonth() + 1 });
     }
-    return { isWeekly, y, n, start, week, months };
+    return { isWeekly, isMultiYear, y, n, start, week, months };
   }
 
   function getSelectedRecords() {
@@ -1801,7 +1824,42 @@
   }
 
   function getUnsummarizedRecords() {
-    return getSelectedRecords().filter(r => !r.isSummarized);
+    const { isMultiYear } = getSelectedRange();
+    const allRs = getSelectedRecords();
+    return isMultiYear ? allRs : allRs.filter(r => !r.isSummarized);
+  }
+
+  function getSavedAnnualSummariesInRange() {
+    const { y, months } = getSelectedRange();
+    const endYear = months[months.length - 1].year;
+    return savedSummaries
+      .filter(s => {
+        if (Number(s.period) !== 12) return false;
+        if (currentUser?.role === 'dept') {
+          const hasDept = s.department === currentUser.department || Boolean(s.byDept && s.byDept[currentUser.department]);
+          if (!hasDept) return false;
+        }
+        const sy = Number(s.year || 0);
+        return sy >= y && sy <= endYear;
+      })
+      .sort((a, b) => String(a.updated || '').localeCompare(String(b.updated || '')));
+  }
+
+  function getMultiYearActiveDepts(rs) {
+    if (currentUser?.role === 'dept') return [currentUser.department];
+    const deptSet = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean));
+    getSavedAnnualSummariesInRange().forEach(s => {
+      if (s.department) deptSet.add(s.department.trim());
+      if (s.byDept) {
+        Object.keys(s.byDept).forEach(d => {
+          if (s.byDept[d]) deptSet.add(d.trim());
+        });
+      }
+    });
+    return [
+      ...DEPARTMENTS.filter(d => deptSet.has(d)),
+      ...[...deptSet].filter(d => !DEPARTMENTS.includes(d))
+    ];
   }
 
   async function markRecordsAsSummarized(rs) {
@@ -1821,10 +1879,27 @@
 
   function updateStats() {
     if (!$('stats')) return;
-    const { isWeekly, n, week } = getSelectedRange();
+    const { isWeekly, isMultiYear, y, n, week, months } = getSelectedRange();
     const allRs = getSelectedRecords();
     const newRs = allRs.filter(r => !r.isSummarized);
     const doneCount = allRs.length - newRs.length;
+
+    if (isMultiYear) {
+      const annualList = getSavedAnnualSummariesInRange();
+      const activeDepts = getMultiYearActiveDepts(allRs);
+      const endYear = months[months.length - 1].year;
+      const foundYears = [...new Set(annualList.map(s => Number(s.year)))].sort((a, b) => a - b);
+      const yearsPreview = foundYears.length ? foundYears.join(', ') : `${y} - ${endYear}`;
+
+      $('stats').innerHTML = `
+        <div class="stat"><b>${activeDepts.length}/${DEPARTMENTS.length}</b> ພາກສ່ວນທີ່ມີຂໍ້ມູນ</div>
+        <div class="stat"><b>${foundYears.length}/${n / 12}</b> ປີທີ່ມີບົດສະຫຼຸບປະຈຳປີ (${esc(yearsPreview)})</div>
+        <div class="stat"><b>${allRs.length}</b> ບົດຍ່ອຍສະສົມ</div>
+        <div class="stat"><b>${y} - ${endYear}</b> (${n / 12} ປີ)</div>
+      `;
+      return;
+    }
+
     const submittedDepts = new Set(allRs.map(r => (r.department || '').trim()).filter(Boolean)).size;
     const newChars = newRs.reduce((sum, r) => sum + r.text.length, 0).toLocaleString();
     const rangeStat = isWeekly ? `<b>ອາທິດ ${esc(week)}</b> ປະຈຳເດືອນ` : `<b>${n}</b> ເດືອນ`;
@@ -1842,7 +1917,51 @@
   // 5. ການສັງລວມບົດລາຍງານ ແລະ ເຊື່ອມຕໍ່ AI
   // =========================================================
   function periodName(n) {
-    return n === 1 ? 'ປະຈຳເດືອນ' : `${n} ເດືອນ`;
+    if (n === 1) return 'ປະຈຳເດືອນ';
+    if (n === 60) return '5 ປີ';
+    if (n === 120) return '10 ປີ';
+    return `${n} ເດືອນ`;
+  }
+
+  function formatDeptSourceBody(dept, items, range) {
+    if (!range.isMultiYear) {
+      return items.map(r => {
+        const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
+        const timeTag = isMonthly
+          ? `ລາຍງານປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}`
+          : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
+        return `[${timeTag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
+      }).join('\n\n');
+    }
+
+    // ສຳລັບ 5 ປີ / 10 ປີ: ດຶງບົດສະຫຼຸບປະຈຳປີທີ່ມີໃນຄັງມາໃຊ້ກ່ອນ ແລະ ລວມບົດຍ່ອຍແຍກຕາມປີ
+    const annualSummaries = getSavedAnnualSummariesInRange();
+    const annualByYear = {};
+    annualSummaries.forEach(s => {
+      const subText = (s.byDept && s.byDept[dept]) ? s.byDept[dept] : (s.department === dept ? s.text : '');
+      if (subText) annualByYear[Number(s.year)] = subText;
+    });
+
+    const itemsByYear = {};
+    items.forEach(r => {
+      const yr = Number(r.year);
+      if (!itemsByYear[yr]) itemsByYear[yr] = [];
+      itemsByYear[yr].push(r);
+    });
+
+    const allYears = [...new Set([
+      ...Object.keys(annualByYear).map(Number),
+      ...Object.keys(itemsByYear).map(Number)
+    ])].sort((a, b) => a - b);
+
+    const maxPerYear = Math.max(1800, Math.floor(18000 / Math.max(1, allYears.length)));
+    return allYears.map((yr, idx) => {
+      if (annualByYear[yr]) {
+        return `=== ປີທີ ${idx + 1} (ບົດສະຫຼຸບປະຈຳປີ ${yr}) ===\n${annualByYear[yr].slice(0, maxPerYear)}`;
+      }
+      const rawYearText = (itemsByYear[yr] || []).map(r => r.text).join('\n');
+      return `=== ປີທີ ${idx + 1} (ຂໍ້ມູນລາຍງານປີ ${yr}) ===\n${rawYearText.slice(0, maxPerYear)}`;
+    }).join('\n\n');
   }
 
   function buildSingleDeptPrompt(dept, items) {
@@ -1855,22 +1974,19 @@
       official: 'ໃຊ້ສຳນວນພາສາລາຊະການທາງການ ສຸພາບ ແລະ ໜັກແໜ້ນ.'
     };
 
-    const body = items.map(r => {
-      const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
-      const timeTag = isMonthly
-        ? `ລາຍງານປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}`
-        : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
-      return `[${timeTag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
-    }).join('\n\n');
+    const body = formatDeptSourceBody(dept, items, range);
+    const multiYearNote = range.isMultiYear
+      ? `\n   - ເນື່ອງຈາກເປັນບົດສະຫຼຸບໄລຍະຍາວ (${range.n / 12} ປີ) ໃຫ້ສັງເຄາະພາບລວມຜົນສຳເລັດພົ້ນເດັ່ນສະສົມຕະຫຼອດໄລຍະ ${range.n / 12} ປີ ຈັດເປັນໝວດວຽກງານໃຫຍ່ ໂດຍບໍ່ຕ້ອງລົງລາຍລະອຽດວຽກຍ່ອຍປະຈຳອາທິດ.`
+      : '';
 
     return [
       `ຈົ່ງສັງເຄາະບົດລາຍງານທັງໝົດຂອງ "${dept}" ໃຫ້ເປັນ "ບົດສະຫຼຸບການຈັດຕັ້ງປະຕິບັດວຽກງານຂອງ ${dept}" ${rangeText}. ${styleMap[style]}`,
       '',
       'ຫຼັກການສັງເຄາະ:',
       `1. ຫົວບົດໃຫ້ຂຽນໃນນາມ "${dept}" ແລ້ວຈັດແຍກເນື້ອໃນອອກເປັນ 3 ພາກໃຫຍ່ຄື:`,
-      '   - ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ (ສັງເຄາະລວມເນື້ອໃນຈາກທຸກອາທິດ/ເດືອນເຂົ້າກັນ ຈັດລຽງເປັນຂໍ້ໆຕາມໜ້າວຽກໃຫ້ຊັດເຈນ, ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ).',
+      `   - ພາກທີ I: ຜົນການຈັດຕັ້ງປະຕິບັດວຽກງານວິຊາສະເພາະ (ສັງເຄາະລວມເນື້ອໃນຈາກທຸກໄລຍະເຂົ້າກັນ ຈັດລຽງເປັນຂໍ້ໆຕາມໜ້າວຽກໃຫ້ຊັດເຈນ, ຕັດຂໍ້ທີ່ຊ້ຳກັນອອກ ແຕ່ຮັກສາຊື່ໂຄງການ, ສະຖານທີ່, ສົກຮຽນ ແລະ ຕົວເລກໃຫ້ຄົບຖ້ວນ).${multiYearNote}`,
       '   - ພາກທີ II: ຂໍ້ສະດວກ, ຂໍ້ຫຍຸ້ງຍາກ ແລະ ວຽກທີ່ຍັງຄົງຄ້າງ (ຖ້າບໍ່ມີໃຫ້ຂຽນວ່າ: - ບໍ່ມີຂໍ້ມູນວຽກຄົງຄ້າງທີ່ລະບຸໄວ້).',
-      '   - ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ (ສັງລວມທິດທາງແຜນການຈຸດສຸມໃນໄລຍະຕໍ່ໄປ).',
+      `   - ພາກທີ III: ທິດທາງແຜນການໃນຕໍ່ໜ້າ (ສັງລວມທິດທາງແຜນການຈຸດສຸມ${range.isMultiYear ? `ໃນໄລຍະ ${range.n / 12} ປີຕໍ່ໜ້າ` : 'ໃນໄລຍະຕໍ່ໄປ'}).`,
       '2. ຫ້າມເພີ່ມຂໍ້ເທັດຈິງ, ຜົນສຳເລັດ ຫຼື ເຫດການທີ່ບໍ່ມີໃນຂໍ້ມູນຕົ້ນສະບັບ.',
       '3. ຂຽນໃຫ້ຈົບຄົບຖ້ວນທັງ 3 ພາກ ດ້ວຍພາສາລາວທາງການ 100%, ຫ້າມປົນຕົວອັກສອນພາສາໄທ ຫຼື ພາສາຂະແມ ແລະ ຫ້າມຂຽນຄຳແປໃນວົງເລັບ.',
       '4. ຕອບເປັນຂໍ້ຄວາມທຳມະດາ (Plain Text) ເທົ່ານັ້ນ, ຫ້າມໃຊ້ສັນຍາລັກ Markdown ເຊັ່ນ **, ###, --- ຫຼື __ ຢ່າງເດັດຂາດ.',
@@ -1895,13 +2011,7 @@
 
     const groupedByDept = activeDepts.map((dept, idx) => {
       const items = rs.filter(r => (r.department || '').trim() === dept);
-      const body = items.map(r => {
-        const isMonthly = (r.reportType || (r.week ? 'weekly' : 'monthly')) === 'monthly';
-        const timeTag = isMonthly
-          ? `ລາຍງານປະຈຳເດືອນ ${MONTHS[r.month - 1]} ${r.year}`
-          : `ອາທິດທີ ${r.week} (${MONTHS[r.month - 1]} ${r.year})`;
-        return `[${timeTag}${r.title ? ' | ' + r.title : ''}]\n${r.text}`;
-      }).join('\n\n');
+      const body = formatDeptSourceBody(dept, items, range);
       return `\n=== ${idx + 1}. ${dept} ===\n${body}`;
     }).join('\n');
 
@@ -1978,12 +2088,43 @@
   }
 
   function buildSingleDeptFallback(rs, dept) {
-    const rangeText = formatRangeTitle(getSelectedRange());
+    const range = getSelectedRange();
+    const rangeText = formatRangeTitle(range);
     const items = rs.filter(r => (r.department || '').trim() === dept);
+    const sourceDocs = [];
+
+    if (range.isMultiYear) {
+      const annualByYear = {};
+      getSavedAnnualSummariesInRange().forEach(s => {
+        const subText = (s.byDept && s.byDept[dept]) ? s.byDept[dept] : (s.department === dept ? s.text : '');
+        if (subText) annualByYear[Number(s.year)] = subText;
+      });
+      const itemsByYear = {};
+      items.forEach(r => {
+        const yr = Number(r.year);
+        if (!itemsByYear[yr]) itemsByYear[yr] = [];
+        itemsByYear[yr].push(r);
+      });
+      const allYears = [...new Set([
+        ...Object.keys(annualByYear).map(Number),
+        ...Object.keys(itemsByYear).map(Number)
+      ])].sort((a, b) => a - b);
+
+      allYears.forEach(yr => {
+        if (annualByYear[yr]) {
+          sourceDocs.push({ text: annualByYear[yr] });
+        } else {
+          (itemsByYear[yr] || []).forEach(r => sourceDocs.push({ text: r.text }));
+        }
+      });
+    } else {
+      items.forEach(r => sourceDocs.push({ text: r.text }));
+    }
+
     const accepted = [];
     const p1 = [], p2 = [], p3 = [];
 
-    items.forEach(r => {
+    sourceDocs.forEach(r => {
       let section = 1;
       r.text.split(/\n+/).map(l => l.trim()).filter(Boolean).forEach(line => {
         if (/^(ພາກທີ\s*II|II\.|2\.|•?\s*(ຂໍ້ສະດວກ|ຂໍ້ຫຍຸ້ງຍາກ|ວຽກທີ່ຍັງຄົງຄ້າງ|ວຽກຄົງຄ້າງ))/i.test(line)) {
@@ -2029,11 +2170,16 @@
   }
 
   function buildAllOfflineSummaries(rs) {
-    const deptSet = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean));
-    const activeDepts = [
-      ...DEPARTMENTS.filter(d => deptSet.has(d)),
-      ...[...deptSet].filter(d => !DEPARTMENTS.includes(d))
-    ];
+    const range = getSelectedRange();
+    const activeDepts = range.isMultiYear
+      ? getMultiYearActiveDepts(rs)
+      : (() => {
+          const deptSet = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean));
+          return [
+            ...DEPARTMENTS.filter(d => deptSet.has(d)),
+            ...[...deptSet].filter(d => !DEPARTMENTS.includes(d))
+          ];
+        })();
     const byDept = {};
     activeDepts.forEach(dept => {
       byDept[dept] = cleanOutput(buildSingleDeptFallback(rs, dept));
@@ -2420,12 +2566,23 @@
   };
 
   $('generate').onclick = async () => {
+    const range = getSelectedRange();
     const allInRange = getSelectedRecords();
     const rs = getUnsummarizedRecords();
-    if (!rs.length) {
-      const msg = allInRange.length
+    const activeDepts = range.isMultiYear
+      ? getMultiYearActiveDepts(rs)
+      : (() => {
+          const deptSet = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean));
+          return [
+            ...DEPARTMENTS.filter(d => deptSet.has(d)),
+            ...[...deptSet].filter(d => !DEPARTMENTS.includes(d))
+          ];
+        })();
+
+    if (!activeDepts.length) {
+      const msg = (!range.isMultiYear && allInRange.length)
         ? 'ຂໍ້ມູນທັງໝົດໃນໄລຍະທີ່ເລືອກໄດ້ສັງລວມໄປແລ້ວ (ບໍ່ມີຂໍ້ມູນໃໝ່). ຫາກຕ້ອງການສັງລວມບົດເກົ່າຄືນ ໃຫ້ລຶບບົດນັ້ນອອກກ່ອນ ແລ້ວປ້ອນເຂົ້າໄປໃໝ່.'
-        : 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
+        : 'ບໍ່ພົບຂໍ້ມູນ ຫຼື ບົດສະຫຼຸບປະຈຳປີໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
       return setStatus('genStatus', msg, 'err');
     }
 
@@ -2440,11 +2597,6 @@
     showProgress();
     const tick = setInterval(() => showProgress(), 1000);
 
-    const deptSet = new Set(rs.map(r => (r.department || '').trim()).filter(Boolean));
-    const activeDepts = [
-      ...DEPARTMENTS.filter(d => deptSet.has(d)),
-      ...[...deptSet].filter(d => !DEPARTMENTS.includes(d))
-    ];
     const partialByDept = {};
 
     try {
@@ -2484,13 +2636,14 @@
         ? (currentSummaryBundle.byDept[activeViewScope] || '')
         : currentSummaryBundle.overall;
 
-      await markRecordsAsSummarized(rs);
+      const { isMultiYear } = getSelectedRange();
+      if (!isMultiYear) await markRecordsAsSummarized(rs);
 
       const totalSec = ((Date.now() - startTime) / 1000).toFixed(1);
       setStatus(
         'genStatus',
         (cfg.key || cfg.groqBackupKey)
-          ? `ສັງເຄາະດ້ວຍ AI (${activeModel}) ສຳເລັດ ${rs.length} ບົດໃໝ່ (${activeDepts.length} ພາກສ່ວນ) ໃນ ${totalSec} ວິນາທີ ແລະ ລັອກບົດເກົ່າຮຽບຮ້ອຍ.`
+          ? `ສັງເຄາະດ້ວຍ AI (${activeModel}) ສຳເລັດ ${rs.length} ບົດ (${activeDepts.length} ພາກສ່ວນ) ໃນ ${totalSec} ວິນາທີ${isMultiYear ? '' : ' ແລະ ລັອກບົດເກົ່າຮຽບຮ້ອຍ'}.`
           : `ສ້າງບົດລວມ ແລະ ບົດຍ່ອຍ ${activeDepts.length} ພາກສ່ວນສຳເລັດແລ້ວ (ໂໝດພື້ນຖານ).`,
         'ok'
       );
@@ -2509,11 +2662,11 @@
         ? (currentSummaryBundle.byDept[activeViewScope] || '')
         : currentSummaryBundle.overall;
 
-      await markRecordsAsSummarized(rs);
+      if (!getSelectedRange().isMultiYear) await markRecordsAsSummarized(rs);
 
       setStatus(
         'genStatus',
-        `ເຊີບເວີ AI ບໍ່ວ່າງ — ລະບົບຈຶ່ງສັງລວມ ${rs.length} ບົດໃໝ່ (${activeDepts.length} ພາກສ່ວນ) ໃຫ້ອັດຕະໂນມັດແລ້ວ.`,
+        `ເຊີບເວີ AI ບໍ່ວ່າງ — ລະບົບຈຶ່ງສັງລວມ ${rs.length} ບົດ (${activeDepts.length} ພາກສ່ວນ) ໃຫ້ອັດຕະໂນມັດແລ້ວ.`,
         'ok'
       );
     } finally {
@@ -2523,12 +2676,14 @@
   };
 
   $('smartInstant').onclick = async () => {
+    const range = getSelectedRange();
     const allInRange = getSelectedRecords();
     const rs = getUnsummarizedRecords();
-    if (!rs.length) {
-      const msg = allInRange.length
+    const activeDepts = range.isMultiYear ? getMultiYearActiveDepts(rs) : rs;
+    if (!activeDepts.length) {
+      const msg = (!range.isMultiYear && allInRange.length)
         ? 'ຂໍ້ມູນທັງໝົດໃນໄລຍະທີ່ເລືອກໄດ້ສັງລວມໄປແລ້ວ (ບໍ່ມີຂໍ້ມູນໃໝ່). ຫາກຕ້ອງການສັງລວມບົດເກົ່າຄືນ ໃຫ້ລຶບບົດນັ້ນອອກກ່ອນ ແລ້ວປ້ອນເຂົ້າໄປໃໝ່.'
-        : 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
+        : 'ບໍ່ພົບຂໍ້ມູນ ຫຼື ບົດສະຫຼຸບປະຈຳປີໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
       return setStatus('genStatus', msg, 'err');
     }
     currentSummaryBundle = buildAllOfflineSummaries(rs);
@@ -2537,19 +2692,21 @@
       ? (currentSummaryBundle.byDept[activeViewScope] || '')
       : currentSummaryBundle.overall;
 
-    await markRecordsAsSummarized(rs);
+    if (!range.isMultiYear) await markRecordsAsSummarized(rs);
 
     const deptCount = Object.keys(currentSummaryBundle.byDept).length;
-    setStatus('genStatus', `ສັງລວມ ${rs.length} ບົດໃໝ່ (${deptCount} ພາກສ່ວນ) ສຳເລັດທັນທີ ແລະ ລັອກຂໍ້ມູນເກົ່າໄວ້ກວດກາຄືນຫຼັງແລ້ວ.`, 'ok');
+    setStatus('genStatus', `ສັງລວມ (${deptCount} ພາກສ່ວນ) ສຳເລັດທັນທີ${range.isMultiYear ? '' : ' ແລະ ລັອກຂໍ້ມູນເກົ່າໄວ້ກວດກາຄືນຫຼັງແລ້ວ'}.`, 'ok');
   };
 
   $('copyForWebAI').onclick = async () => {
+    const range = getSelectedRange();
     const allInRange = getSelectedRecords();
     const rs = getUnsummarizedRecords();
-    if (!rs.length) {
-      const msg = allInRange.length
+    const hasData = range.isMultiYear ? getMultiYearActiveDepts(rs).length > 0 : rs.length > 0;
+    if (!hasData) {
+      const msg = (!range.isMultiYear && allInRange.length)
         ? 'ຂໍ້ມູນທັງໝົດໃນໄລຍະທີ່ເລືອກໄດ້ສັງລວມໄປແລ້ວ (ບໍ່ມີຂໍ້ມູນໃໝ່).'
-        : 'ບໍ່ພົບຂໍ້ມູນໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
+        : 'ບໍ່ພົບຂໍ້ມູນ ຫຼື ບົດສະຫຼຸບປະຈຳປີໃນໄລຍະທີ່ເລືອກ. ກະລຸນາບັນທຶກລາຍງານກ່ອນ.';
       return setStatus('genStatus', msg, 'err');
     }
     const promptText = buildPrompt(rs);
