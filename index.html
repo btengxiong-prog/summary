@@ -2152,7 +2152,7 @@
     // 2. ຖ້າ Google AI ລົ້ມເຫຼວທັງໝົດ ແຕ່ມີ Groq Backup Key -> ສະຫຼັບໄປ Groq ອັດຕະໂນມັດທັນທີ!
     if (groqBackupKey) {
       const groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
-      const groqModels = ['openai/gpt-oss-120b', 'openai/gpt-oss-20b', 'qwen/qwen3.8-27b', 'llama-3.3-70b-versatile'];
+      const groqModels = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
       for (const gm of groqModels) {
         onProgress?.(`Google AI ບໍ່ວ່າງ — ກຳລັງສະຫຼັບໄປ Groq (${gm}) ອັດຕະໂນມັດ...`);
         onModelUsed?.(`Groq: ${gm}`);
@@ -2641,7 +2641,7 @@
 
   $('presetGroq').onclick = () => {
     $('endpoint').value = 'https://api.groq.com/openai/v1/chat/completions';
-    $('model').value = 'openai/gpt-oss-120b';
+    $('model').value = 'llama-3.3-70b-versatile';
     setStatus('aiStatus', 'ຕັ້ງຄ່າເປັນ Groq ແລ້ວ — ເອົາ API Key ຟຣີທີ່ console.groq.com ມາວາງ ແລ້ວກົດບັນທຶກ', 'ok');
   };
 
